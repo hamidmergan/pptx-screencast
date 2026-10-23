@@ -7,3 +7,4 @@ private
 .env
 .*/
 *.mp4
+build
