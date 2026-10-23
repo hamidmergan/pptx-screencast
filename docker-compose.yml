@@ -1,0 +1,31 @@
+services:
+  pptx-screencast:
+    build: .
+    ports:
+      # Set PPTX_SCREENCAST_PORT if 8000 is already taken on your machine.
+      - "${PPTX_SCREENCAST_PORT:-8000}:8000"
+    environment:
+      # URL of your OpenAI-compatible server. From inside the container, a server
+      # on the host is reachable as host.docker.internal, not as localhost.
+      PPTX_SCREENCAST_BASE_URL: ${PPTX_SCREENCAST_BASE_URL:-}
+      PPTX_SCREENCAST_MODEL: ${PPTX_SCREENCAST_MODEL:-}
+      # Optional, many self-hosted servers need no key.
+      PPTX_SCREENCAST_API_KEY: ${PPTX_SCREENCAST_API_KEY:-}
+      # The speech route. Without its own values it uses the chat values.
+      PPTX_SCREENCAST_TTS_BASE_URL: ${PPTX_SCREENCAST_TTS_BASE_URL:-}
+      PPTX_SCREENCAST_TTS_MODEL: ${PPTX_SCREENCAST_TTS_MODEL:-}
+      PPTX_SCREENCAST_TTS_API_KEY: ${PPTX_SCREENCAST_TTS_API_KEY:-}
+      PPTX_SCREENCAST_VOICE: ${PPTX_SCREENCAST_VOICE:-}
+      # The speech recognition route, only needed for subtitles.
+      PPTX_SCREENCAST_STT_BASE_URL: ${PPTX_SCREENCAST_STT_BASE_URL:-}
+      PPTX_SCREENCAST_STT_MODEL: ${PPTX_SCREENCAST_STT_MODEL:-}
+      PPTX_SCREENCAST_STT_API_KEY: ${PPTX_SCREENCAST_STT_API_KEY:-}
+      # Optional defaults of the page.
+      PPTX_SCREENCAST_LANGUAGE: ${PPTX_SCREENCAST_LANGUAGE:-}
+      PPTX_SCREENCAST_SPEED: ${PPTX_SCREENCAST_SPEED:-}
+      PPTX_SCREENCAST_SLIDE_PAUSE: ${PPTX_SCREENCAST_SLIDE_PAUSE:-}
+      PPTX_SCREENCAST_RESOLUTION: ${PPTX_SCREENCAST_RESOLUTION:-}
+      PPTX_SCREENCAST_SUBTITLES: ${PPTX_SCREENCAST_SUBTITLES:-}
+      PPTX_SCREENCAST_MAX_SLIDES: ${PPTX_SCREENCAST_MAX_SLIDES:-}
+      PPTX_SCREENCAST_MAX_WORKERS: ${PPTX_SCREENCAST_MAX_WORKERS:-}
+    restart: unless-stopped

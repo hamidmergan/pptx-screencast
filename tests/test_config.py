@@ -74,3 +74,34 @@ def test_burn_in_without_subtitles_is_refused():
 def test_values_must_be_positive():
     with pytest.raises(ConfigError):
         config.resolve(base_url="http://x/v1", model="chat", require_voice=False, resolution=0)
+
+
+# -- What the page starts with --
+
+def test_the_page_defaults_come_from_the_environment(monkeypatch):
+    monkeypatch.setenv("PPTX_SCREENCAST_BASE_URL", "http://x/v1")
+    monkeypatch.setenv("PPTX_SCREENCAST_TTS_MODEL", "tts")
+    monkeypatch.setenv("PPTX_SCREENCAST_SPEED", "0.9")
+    monkeypatch.setenv("PPTX_SCREENCAST_SUBTITLES", "yes")
+    found = config.env_defaults()
+    assert found["base_url"] == "http://x/v1"
+    assert found["tts_model"] == "tts"
+    assert found["speed"] == 0.9
+    assert found["subtitles"] is True
+    assert "model" not in found, "nothing is filled in that was not set"
+
+
+def test_the_page_defaults_are_empty_without_the_environment():
+    assert config.env_defaults() == {}
+
+
+def test_a_broken_number_in_the_environment_is_named(monkeypatch):
+    monkeypatch.setenv("PPTX_SCREENCAST_SPEED", "fast")
+    with pytest.raises(ConfigError) as info:
+        config.env_defaults()
+    assert "PPTX_SCREENCAST_SPEED" in str(info.value)
+
+
+def test_the_openai_key_is_taken_as_a_page_default(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "secret")
+    assert config.env_defaults()["api_key"] == "secret"

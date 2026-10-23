@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from . import __version__
+from . import config
 from .core import make_video, write_script
 from .errors import ScreencastError
 from .selection import parse_slides
@@ -109,8 +110,11 @@ def _serve(argv: List[str]) -> int:
     except ImportError:
         print(UI_HINT, file=sys.stderr)
         return 2
+    # The environment first, then whatever the flags say on top of it.
+    defaults = config.env_defaults()
+    defaults.update({k: v for k, v in _model_options(args).items() if v is not None})
     app = create_app(
-        _model_options(args),
+        defaults,
         # On loopback only our own host names are accepted, so another web
         # page cannot reach the server through DNS rebinding.
         allowed_hosts=list(LOOPBACK) if args.host in LOOPBACK else None,

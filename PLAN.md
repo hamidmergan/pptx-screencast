@@ -41,8 +41,12 @@ language before it is spoken.
 - [x] 5 Tests with a fake server for chat, speech and recognition.
 - [x] 6 README, CHANGELOG 0.1.0, local smoke test with a real model.
 - [x] 7 English sweep, acceptance checks, final commit.
-- [ ] 8 Web UI and Docker.
+- [x] 8 Web UI and Docker.
 
 ## Open
 
-- Step 8 is open.
+- `doc2speech` is declared as a normal version dependency. Until it is on a
+  package index, the Docker image cannot resolve it from there. The image was
+  built and tested against a locally built wheel of it.
+- Burn in needs an ffmpeg built with libass. The image has one, a Homebrew
+  ffmpeg on macOS usually does not, and then the cues stay in their own track.

@@ -249,3 +249,43 @@ def _validate(s: Settings) -> None:
         raise ConfigError("burn_in needs subtitles to be switched on as well.")
     if s.speed > 100:
         raise ConfigError(f"speed must be a factor such as 0.9 or 1.2, but is {s.speed}.")
+
+
+# Settings the page offers as its own defaults, read without validating,
+# because the page works with empty fields too.
+PAGE_SETTINGS = (
+    ("base_url", "BASE_URL", str),
+    ("model", "MODEL", str),
+    ("api_key", "API_KEY", str),
+    ("tts_base_url", "TTS_BASE_URL", str),
+    ("tts_model", "TTS_MODEL", str),
+    ("tts_api_key", "TTS_API_KEY", str),
+    ("stt_base_url", "STT_BASE_URL", str),
+    ("stt_model", "STT_MODEL", str),
+    ("stt_api_key", "STT_API_KEY", str),
+    ("voice", "VOICE", str),
+    ("language", "LANGUAGE", str),
+    ("speed", "SPEED", float),
+    ("slide_pause", "SLIDE_PAUSE", float),
+    ("resolution", "RESOLUTION", int),
+    ("subtitles", "SUBTITLES", _flag),
+    ("burn_in", "BURN_IN", _flag),
+)
+
+
+def env_defaults() -> dict:
+    """What the environment offers, with nothing filled in and nothing checked."""
+    found: dict = {}
+    for name, env_name, cast in PAGE_SETTINGS:
+        raw = _env(env_name)
+        if raw is None:
+            continue
+        try:
+            found[name] = cast(raw)
+        except ValueError:
+            raise ConfigError(
+                f"Environment variable {ENV_PREFIX}{env_name} has an invalid value: {raw!r}"
+            )
+    if "api_key" not in found and os.environ.get("OPENAI_API_KEY"):
+        found["api_key"] = os.environ["OPENAI_API_KEY"]
+    return found

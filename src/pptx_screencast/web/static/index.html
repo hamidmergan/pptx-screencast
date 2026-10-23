@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pptx-screencast</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Screencast</h1>
+    <span class="muted">Turn PowerPoint slides into a narrated video, optionally in another language.</span>
+  </header>
+
+  <nav class="steps" aria-label="Steps">
+    <span class="step current" data-step="1">1. Presentation</span>
+    <span class="step" data-step="2">2. Scripts</span>
+    <span class="step" data-step="3">3. Settings</span>
+    <span class="step" data-step="4">4. Video</span>
+  </nav>
+
+  <main>
+    <p id="tools-warning" class="card error" hidden></p>
+
+    <!-- Step 1 -->
+    <section id="step-1" class="card">
+      <h2>Presentation</h2>
+      <label id="drop" class="drop">
+        <input type="file" id="file" accept=".pptx" hidden>
+        <strong>Drop file here or browse</strong>
+        <span class="muted">Only .pptx file</span>
+      </label>
+      <p id="chosen" class="muted" hidden></p>
+
+      <h2 class="spaced">How should the scripts be created?</h2>
+      <div class="choices">
+        <label class="choice">
+          <input type="radio" name="source" value="generate" checked>
+          <span>
+            <strong>Model generation</strong>
+            <span class="muted">The model creates scripts automatically based on the slide contents.</span>
+          </span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="source" value="notes">
+          <span>
+            <strong>From the speaker notes</strong>
+            <span class="muted">The text in the notes of each slide becomes its script.</span>
+          </span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="source" value="import">
+          <span>
+            <strong>Import scripts</strong>
+            <span class="muted">Upload a Markdown file with one heading per slide.</span>
+          </span>
+        </label>
+      </div>
+
+      <div id="import-pane" hidden>
+        <label id="script-drop" class="drop small">
+          <input type="file" id="script-file" accept=".md,.markdown,.txt" hidden>
+          <strong>Drop the script file here or browse</strong>
+        </label>
+        <p id="script-chosen" class="muted" hidden></p>
+      </div>
+
+      <div class="options">
+        <label>Narration language
+          <input type="text" id="language" list="languages" placeholder="e.g. en">
+          <datalist id="languages">
+            <option value="en"><option value="de"><option value="fr"><option value="es">
+            <option value="it"><option value="nl"><option value="pt"><option value="pl">
+            <option value="tr"><option value="ar">
+          </datalist>
+          <span class="muted">The model writes the narration scripts in this language.</span>
+        </label>
+        <label>Translate into
+          <input type="text" id="translate" placeholder="optional, e.g. German">
+          <span class="muted">The finished narration is translated before it is spoken.</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <button id="to-scripts" class="primary">Create scripts</button>
+        <span id="step1-progress" class="muted" hidden></span>
+      </div>
+      <p id="step1-error" class="error" hidden></p>
+    </section>
+
+    <!-- Step 2 -->
+    <section id="step-2" class="card" hidden>
+      <h2>Review and adjust scripts</h2>
+      <p class="muted">Review the script for each slide and change what you want to change. An empty script means the slide stays silent.</p>
+      <div id="scripts"></div>
+      <div class="row">
+        <button id="back-to-1">Back</button>
+        <button id="to-settings" class="primary">Accept all scripts</button>
+      </div>
+      <p id="step2-error" class="error" hidden></p>
+    </section>
+
+    <!-- Step 3 -->
+    <section id="step-3" class="card" hidden>
+      <h2>Settings</h2>
+      <div class="options">
+        <label>Voice
+          <input type="text" id="voice" placeholder="e.g. alloy">
+        </label>
+        <label>Speed
+          <input type="number" id="speed" step="0.1" min="0.5" max="2">
+          <span class="muted">Slower speed recommended for educational videos.</span>
+        </label>
+        <label>Pause between slides
+          <input type="number" id="slide-pause" step="0.5" min="0" max="3">
+          <span class="muted">In seconds.</span>
+        </label>
+        <label>Image quality
+          <select id="resolution">
+            <option value="72">Low quality</option>
+            <option value="100">Standard</option>
+            <option value="144">Maximum quality</option>
+          </select>
+          <span class="muted">Higher quality means a longer render.</span>
+        </label>
+        <label>Slides
+          <input type="text" id="slides" placeholder="all, e.g. 1-5,8">
+          <span class="muted">Which slides go into the screencast.</span>
+        </label>
+      </div>
+      <label class="check">
+        <input type="checkbox" id="subtitles">
+        Add subtitles
+      </label>
+      <p class="muted indent">The spoken text is recognised and added to the video as a subtitle track. Needs a speech recognition model. Rendering takes a little longer.</p>
+      <label class="check">
+        <input type="checkbox" id="burn-in">
+        Draw the subtitles into the picture as well
+      </label>
+      <div class="row">
+        <button id="back-to-2">Back to script editor</button>
+        <button id="render" class="primary">Create screencast</button>
+      </div>
+      <p id="step3-error" class="error" hidden></p>
+    </section>
+
+    <!-- Step 4 -->
+    <section id="step-4" class="card" hidden>
+      <h2 id="result-heading">Creating video...</h2>
+      <p id="render-progress" class="muted">Voiceover and video production, this may take a few minutes.</p>
+      <video id="video" controls hidden></video>
+      <div id="downloads" class="row" hidden>
+        <a id="download-mp4" class="button primary" href="/api/video" download>MP4</a>
+        <a id="download-srt" class="button" href="/api/subtitles.srt" download hidden>Subtitles</a>
+        <a id="download-zip" class="button" href="/api/zip" download>Download all (ZIP)</a>
+        <button id="again">New screencast</button>
+      </div>
+      <p id="step4-error" class="error" hidden></p>
+    </section>
+
+    <section class="card">
+      <h2>Server</h2>
+      <p class="muted">Settings come from the environment. Fields left empty keep the value the server was started with. The speech and recognition routes fall back to the chat values.</p>
+      <div class="options">
+        <label class="wide">Base URL
+          <input type="text" id="base-url" placeholder="http://localhost:11434/v1">
+        </label>
+        <label class="wide">Chat model
+          <input type="text" id="model" placeholder="your-chat-model">
+        </label>
+        <label class="wide">API key
+          <input type="password" id="api-key" placeholder="only if the server needs one">
+        </label>
+        <label class="wide">Speech server
+          <input type="text" id="tts-base-url" placeholder="same as the base URL">
+        </label>
+        <label class="wide">Speech model
+          <input type="text" id="tts-model" placeholder="your-tts-model">
+        </label>
+        <label class="wide">Speech key
+          <input type="password" id="tts-api-key" placeholder="same as the API key">
+        </label>
+        <label class="wide">Recognition server
+          <input type="text" id="stt-base-url" placeholder="same as the base URL">
+        </label>
+        <label class="wide">Recognition model
+          <input type="text" id="stt-model" placeholder="only for subtitles">
+        </label>
+        <label class="wide">Recognition key
+          <input type="password" id="stt-api-key" placeholder="same as the API key">
+        </label>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
