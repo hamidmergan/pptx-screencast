@@ -133,3 +133,104 @@ def test_a_failure_that_is_not_the_servers_is_final():
     assert not module.is_transient(ConfigError("Missing: voice"))
     assert not module.is_transient(EmptyTextError("Please enter some text."))
     assert not module.is_transient(RuntimeError("something else entirely"))
+
+
+# -- A narration long enough to need several requests --
+
+# 1980 characters, just under the default ceiling of 2000.
+LONG_SCRIPT = (
+    "The slide shows the measured result of the second experiment. "
+    * 40
+)[:1980]
+
+
+def test_a_long_narration_is_split_into_parts():
+    parts = module.split_narration(LONG_SCRIPT)
+    assert len(parts) == 6, "1980 characters, at most 400 per request"
+    assert all(len(part) <= module.CHUNK_CHARS for part in parts)
+    assert "".join(parts) == LONG_SCRIPT
+
+
+def test_a_healthy_server_is_asked_once_per_part(tmp_path, server):
+    paths = module.speak_all([LONG_SCRIPT], tmp_path, _settings(server), max_workers=1)
+    assert paths[0] is not None and paths[0].stat().st_size > 0
+    assert server.count("speech") == 6
+
+
+def test_one_bad_part_costs_one_more_request_and_not_the_whole_slide(
+    tmp_path, server, monkeypatch
+):
+    """The retry sits on the part, so the four good parts are not paid twice."""
+    monkeypatch.setattr(module, "RETRY_DELAYS", (0.0, 0.0, 0.0))
+    server.speech_fail_indexes = {2}
+    server.status = 503
+    paths = module.speak_all([LONG_SCRIPT], tmp_path, _settings(server), max_workers=1)
+    assert paths[0] is not None
+    assert server.count("speech") == 7
+
+
+def test_a_dead_server_stops_after_the_first_part_gave_up(tmp_path, server, monkeypatch):
+    """Four attempts on one part, then the slide is over. No other part is asked."""
+    monkeypatch.setattr(module, "RETRY_DELAYS", (0.0, 0.0, 0.0))
+    server.fail_times = 99
+    server.status = 503
+    with pytest.raises(ModelError):
+        module.speak_all([LONG_SCRIPT], tmp_path, _settings(server), max_workers=1)
+    assert server.count("speech") == 4
+
+
+def test_the_parts_of_all_slides_share_one_pool(tmp_path, server):
+    """Two long slides are 12 requests, never more than max_workers at a time."""
+    import threading
+
+    open_now = [0]
+    seen = [0]
+    lock = threading.Lock()
+    real = server.speech
+
+    def counting(handler, body):
+        with lock:
+            open_now[0] += 1
+            seen[0] = max(seen[0], open_now[0])
+        try:
+            return real(handler, body)
+        finally:
+            with lock:
+                open_now[0] -= 1
+
+    server.speech = counting
+    paths = module.speak_all(
+        [LONG_SCRIPT, LONG_SCRIPT], tmp_path, _settings(server), max_workers=2
+    )
+    assert all(p is not None for p in paths)
+    assert server.count("speech") == 12
+    assert seen[0] <= 2
+
+
+def test_the_progress_counts_only_the_slides_it_speaks(tmp_path, server):
+    seen = []
+    module.speak_all(
+        ["One.", "Two.", "Three.", "Four."], tmp_path, _settings(server),
+        excluded={1, 3},
+        on_slide_done=lambda done, total, index: seen.append((done, total, index)),
+        max_workers=1,
+    )
+    assert seen == [(1, 2, 0), (2, 2, 2)]
+
+
+def test_a_foreign_speed_variable_is_pointed_out(tmp_path, server, monkeypatch, caplog):
+    monkeypatch.setenv("DOC2SPEECH_SPEED", "0.8")
+    with caplog.at_level("WARNING"):
+        module.speak_all(["One."], tmp_path, _settings(server))
+    assert "DOC2SPEECH_SPEED" in caplog.text
+
+
+def test_a_whole_deck_against_a_dead_server_costs_one_ladder(tmp_path, server, monkeypatch):
+    """The run stops asking as soon as one part has given up for good."""
+    monkeypatch.setattr(module, "RETRY_DELAYS", (0.0, 0.0, 0.0))
+    server.fail_times = 99
+    server.status = 503
+    with pytest.raises(ModelError):
+        module.speak_all([LONG_SCRIPT] * 40, tmp_path, _settings(server), max_workers=4)
+    # Four parts in flight, four attempts each, and nothing after that.
+    assert server.count("speech") == 16

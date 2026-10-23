@@ -53,6 +53,8 @@ class FakeServer:
         self.scripts = None
         self.reply = None
         self.fail_times = 0
+        # Zero-based indexes of speech requests that fail, for a single blip.
+        self.speech_fail_indexes: set = set()
         self.status = 500
         self.transcript_words = None
         outer = self
@@ -125,7 +127,10 @@ class FakeServer:
         )
 
     def speech(self, handler, body):
+        index = self.count("speech")
         self.requests.append({"route": "speech", "body": body})
+        if index in self.speech_fail_indexes:
+            return handler._json({"error": {"message": "busy"}}, self.status)
         if self.fail_times > 0:
             self.fail_times -= 1
             return handler._json({"error": {"message": "busy"}}, self.status)
