@@ -463,3 +463,41 @@ def test_the_summed_clips_stay_close_to_the_joined_timeline(
     drift = abs(get_video_duration(out) - summed)
     # About 8 ms per clip, measured. Six clips must stay well under a tenth.
     assert drift < 0.1, f"{drift} seconds of drift over {len(clips) + 2} clips"
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_a_deck_past_the_first_ten_slides_keeps_its_order(server, tmp_path, monkeypatch):
+    """Slide 10 is where the image names grow a digit, so the order is checked here."""
+    from PIL import Image, ImageDraw
+
+    from _pptx_fixtures import notes_pptx
+
+    count = 12
+    deck = tmp_path / "long.pptx"
+    deck.write_bytes(notes_pptx([f"Note {i + 1}." for i in range(count)]))
+
+    def _images(pptx, folder, dpi=100, max_workers=4):
+        made = []
+        width = len(str(count))
+        for i in range(count):
+            path = folder / f"slide-{i + 1:0{width}d}.png"
+            picture = Image.new("RGB", (160, 120), "white")
+            ImageDraw.Draw(picture).text((10, 10), str(i + 1), fill="black")
+            picture.save(path)
+            made.append(path)
+        return made
+
+    monkeypatch.setattr(core, "pptx_to_images", _images)
+    monkeypatch.setattr(core, "require_tools", lambda **kwargs: None)
+
+    work = tmp_path / "work"
+    out = core.make_video(
+        deck, tmp_path / "long.mp4", notes=True, work_dir=str(work),
+        **_options(server, slide_pause=0.0),
+    )
+    assert server.count("speech") == count
+    clips = sorted(work.glob("clip_0*.mp4"))
+    assert len(clips) == count
+    notice = get_video_duration(work / "clip_notice.mp4")
+    summed = sum(get_video_duration(c) for c in clips) + 2 * notice
+    assert get_video_duration(out) == pytest.approx(summed, abs=0.3)

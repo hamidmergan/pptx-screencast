@@ -224,6 +224,8 @@ Order: argument, then environment variable, then default.
 
 The speech and recognition routes fall back to the chat values, so one server can serve all three and a second one only needs the values it differs in.
 
+`max_slides` is a guard against a deck nobody meant to narrate, not a tested size. A deck at the ceiling means hundreds of speech requests, hundreds of encodes and, with subtitles, hundreds of recognition calls. Start with `--slides` on a long deck.
+
 `min_chars` and `max_chars` are a ceiling, not a target. A slide with one line of content gets two or three sentences, not a padded paragraph.
 
 A missing program or setting is reported before the first long step, naming what to install or set.
