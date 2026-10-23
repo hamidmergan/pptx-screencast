@@ -1,6 +1,8 @@
 """Reading a deck: text, notes, hidden slides and the fit corrections."""
 
+import subprocess
 from io import BytesIO
+from pathlib import Path
 
 from pptx import Presentation
 from pptx.oxml.ns import qn
@@ -227,3 +229,66 @@ def test_the_sample_deck_reads_back(sample_deck):
     assert len(notes) == 4
     assert "Welcome to the tour" in texts[0]
     assert notes[0].startswith("Hello and welcome")
+
+
+# -- A reused work folder (no LibreOffice, the system calls are replaced) --
+
+def _fake_render(monkeypatch, pages: int):
+    """Stand in for soffice, pdfinfo and pdftoppm, nothing else is changed."""
+    from PIL import Image
+
+    from pptx_screencast import slides as module
+
+    real_run = subprocess.run
+
+    def _run(cmd, *args, **kwargs):
+        name = Path(str(cmd[0])).name
+        if name == "soffice":
+            out = Path(cmd[cmd.index("--outdir") + 1])
+            out.mkdir(parents=True, exist_ok=True)
+            (out / f"{Path(cmd[-1]).stem}.pdf").write_bytes(b"%PDF-1.4\n")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        if name == "pdfinfo":
+            return subprocess.CompletedProcess(cmd, 0, f"Pages:          {pages}\n", "")
+        if name == "pdftoppm":
+            page = int(cmd[cmd.index("-f") + 1])
+            prefix = Path(cmd[-1])
+            # pdftoppm pads to the digit width of the whole document.
+            name = f"{prefix.name}-{page:0{len(str(pages))}d}.png"
+            Image.new("RGB", (32, 18), "white").save(prefix.parent / name)
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(module.subprocess, "run", _run)
+    monkeypatch.setattr(module, "find_soffice", lambda: "/usr/bin/soffice")
+
+
+def test_a_reused_work_folder_never_returns_an_older_runs_images(sample_deck, tmp_path, monkeypatch):
+    """A 12 slide run leaves slide-01..12, a later 3 slide run must not take them."""
+    from pptx_screencast.slides import pptx_to_images
+
+    deck = tmp_path / "deck.pptx"
+    deck.write_bytes(sample_deck.read_bytes())
+    sample_deck = deck
+    folder = tmp_path / "images"
+    _fake_render(monkeypatch, 12)
+    first = pptx_to_images(sample_deck, folder, dpi=50)
+    assert len(first) == 12
+
+    _fake_render(monkeypatch, 3)
+    second = pptx_to_images(sample_deck, folder, dpi=50)
+    assert [p.name for p in second] == ["slide-1.png", "slide-2.png", "slide-3.png"]
+    assert sorted(p.name for p in folder.glob("*.png")) == [
+        "slide-1.png", "slide-2.png", "slide-3.png"
+    ]
+
+
+def test_the_images_come_back_in_page_order(sample_deck, tmp_path, monkeypatch):
+    from pptx_screencast.slides import pptx_to_images
+
+    deck = tmp_path / "deck.pptx"
+    deck.write_bytes(sample_deck.read_bytes())
+    sample_deck = deck
+    _fake_render(monkeypatch, 12)
+    images = pptx_to_images(sample_deck, tmp_path / "images", dpi=50)
+    assert [p.name for p in images] == [f"slide-{i:02d}.png" for i in range(1, 13)]

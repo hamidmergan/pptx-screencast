@@ -165,6 +165,26 @@ def test_a_relative_work_directory_works(deck, server, tmp_path, no_libreoffice,
     assert (tmp_path / "work" / "audio" / "slide_000.mp3").exists()
 
 
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_a_reused_work_directory_keeps_no_file_of_the_run_before(
+    deck, server, tmp_path, no_libreoffice
+):
+    """A 12 slide run must not leave anything a 4 slide run could pick up."""
+    work = tmp_path / "work"
+    (work / "images").mkdir(parents=True)
+    (work / "audio").mkdir(parents=True)
+    for i in range(1, 13):
+        (work / "images" / f"slide-{i:02d}.png").write_bytes(b"stale")
+    (work / "audio" / "slide_007.mp3").write_bytes(b"stale")
+
+    core.make_video(deck, tmp_path / "deck.mp4", work_dir=str(work), **_options(server))
+
+    assert sorted(p.name for p in (work / "images").glob("*.png")) == [
+        f"slide-{i}.png" for i in range(1, 5)
+    ]
+    assert not (work / "audio" / "slide_007.mp3").exists()
+
+
 # -- What is refused --
 
 def test_a_script_file_with_the_wrong_count_is_refused(deck, server, tmp_path, no_libreoffice):

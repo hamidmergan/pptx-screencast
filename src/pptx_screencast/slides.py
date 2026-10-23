@@ -397,28 +397,45 @@ def pptx_to_images(
     logger.info("The PDF has %s pages, rendering them in parallel", page_count)
 
     # Convert PDF pages to PNG in parallel - one pdftoppm process per page.
-    slide_prefix = str(output_dir / "slide")
+    # Every page gets a prefix of its own, so the file it produced is known by
+    # name. pdftoppm pads the page number to the digit width of the whole
+    # document, so collecting by a shared prefix would mix a 12 page run
+    # (slide-01) with a later 3 page run (slide-1) in a reused work folder.
+    # A work folder may also be reused, so whatever an earlier run left behind
+    # goes before the first page of this one is written.
+    for stale in sorted(output_dir.glob("slide-*.png")) + sorted(output_dir.glob("page_*.png")):
+        stale.unlink(missing_ok=True)
+    width = len(str(page_count))
 
-    def _render_page(page: int) -> None:
+    def _render_page(page: int) -> Path:
+        prefix = output_dir / f"page_{page:0{width}d}"
         cmd = [
             "pdftoppm", "-png", "-r", str(dpi),
             "-f", str(page), "-l", str(page),
-            str(pdf_path), slide_prefix,
+            str(pdf_path), str(prefix),
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if result.returncode != 0:
             raise SlideError(f"Page {page} could not be rendered: {result.stderr[:200]}")
+        made = sorted(output_dir.glob(f"{prefix.name}*.png"))
+        if not made:
+            raise SlideError(f"Page {page} produced no image.")
+        target = output_dir / f"slide-{page:0{width}d}.png"
+        made[0].replace(target)
+        for extra in made[1:]:
+            extra.unlink(missing_ok=True)
+        return target
 
+    images: list[Path] = [Path()] * page_count
     try:
         with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
             futures = {executor.submit(_render_page, p): p for p in range(1, page_count + 1)}
             for future in as_completed(futures):
-                future.result()  # re-raises on error
+                page = futures[future]
+                images[page - 1] = future.result()  # re-raises on error
     finally:
         pdf_path.unlink(missing_ok=True)  # only a step on the way, the PNGs are the result
 
-    # Collect generated images (pdftoppm names them slide-1.png, slide-2.png, ...)
-    images = sorted(output_dir.glob("slide-*.png"))
     if not images:
         raise SlideError("LibreOffice produced no slide images.")
 

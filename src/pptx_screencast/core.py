@@ -6,6 +6,7 @@ from the deck to the finished MP4 and can start from such a script file.
 """
 
 import logging
+import shutil
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Union
 
@@ -250,6 +251,8 @@ def make_video(
 
 
 def _fresh(folder: Path) -> Path:
+    """An empty folder, so a reused work directory holds nothing older."""
+    shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True, exist_ok=True)
     return folder
 
