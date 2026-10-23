@@ -34,6 +34,18 @@ BURN_IN_TIMEOUT = 1800
 FASTSTART_TIMEOUT = 600
 
 
+def _concat_entry(path: Path) -> str:
+    """One line of an ffmpeg concat list, for any path at all.
+
+    The entry is quoted, and a quote inside the path is closed, escaped and
+    reopened the way a shell does it. Inside single quotes nothing else needs
+    escaping, so a comma, a colon, a bracket and a backslash come through as
+    they are. Measured against real ffmpeg with a path holding each of them.
+    """
+    quoted = str(Path(path).resolve()).replace("'", "'\\''")
+    return f"file '{quoted}'\n"
+
+
 def _run(cmd: List[str], timeout: int, what: str) -> subprocess.CompletedProcess:
     """Run ffmpeg or ffprobe, every system failure leaves as a VideoError."""
     try:
@@ -173,10 +185,10 @@ def create_slide_video(
 
         audio_with_pause_path = output_path.with_suffix(".paused.mp3")
         concat_audio_file = output_path.with_suffix(".audiolist.txt")
-        with open(concat_audio_file, "w") as handle:
+        with open(concat_audio_file, "w", encoding="utf-8") as handle:
             # Absolute, because ffmpeg resolves an entry against the list file.
-            handle.write(f"file '{Path(audio_path).resolve()}'\n")
-            handle.write(f"file '{Path(silence_path).resolve()}'\n")
+            handle.write(_concat_entry(audio_path))
+            handle.write(_concat_entry(silence_path))
         cmd_concat = [
             "ffmpeg", "-y", "-f", "concat", "-safe", "0",
             "-i", str(concat_audio_file),
@@ -214,10 +226,10 @@ def create_slide_video(
 def concatenate_videos(video_paths: List[Path], output_path: Path) -> None:
     """Put the clips of all slides into one MP4, without re-encoding."""
     concat_file = output_path.parent / "concat_list.txt"
-    with open(concat_file, "w") as handle:
+    with open(concat_file, "w", encoding="utf-8") as handle:
         for path in video_paths:
             # Absolute, because ffmpeg resolves an entry against the list file.
-            handle.write(f"file '{Path(path).resolve()}'\n")
+            handle.write(_concat_entry(path))
 
     cmd = [
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",

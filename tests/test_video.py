@@ -311,3 +311,26 @@ def test_the_escaped_path_really_opens_in_a_filter(tmp_path, slide_image, speech
         capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr[-300:]
+
+
+# -- Paths in a concat list --
+
+def test_a_quote_in_a_path_is_closed_escaped_and_reopened():
+    """A bare quote would end the entry in the middle of the path."""
+    entry = module._concat_entry(Path("/x/o'brien/a.mp4"))
+    assert entry == "file '/x/o'\\''brien/a.mp4'\n"
+
+
+@pytest.mark.parametrize("name", [
+    "o'brien", "c:x", "my deck, final", "semi;colon", "br[ack]et",
+    "back\\slash", "eq=uals", "two  spaces", "hash#tag",
+])
+def test_any_path_can_stand_in_a_concat_list(tmp_path, slide_image, speech, name):
+    """Measured against real ffmpeg, one folder name per case."""
+    folder = tmp_path / name
+    folder.mkdir()
+    clip = folder / "clip.mp4"
+    module.create_slide_video(slide_image, speech, clip, pause=0.5)
+    joined = folder / "joined.mp4"
+    module.concatenate_videos([clip], joined)
+    assert module.get_video_duration(joined) == pytest.approx(2.5, abs=0.4)

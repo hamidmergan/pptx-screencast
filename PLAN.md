@@ -132,6 +132,10 @@ below is a behaviour change that was made on purpose, with the reason.
   concat list against the directory of the list file, so a relative
   intermediate path was looked for one folder too deep. Both concat lists now
   hold absolute paths as well.
+- **A concat entry is quoted for any path.** The source wrote `file '<path>'`,
+  so a quote in a folder name ended the entry in the middle of the path. The
+  quote is now closed, escaped and reopened the way a shell does it. Found by
+  a real run in the image with a work folder called `o'brien, c:x work`.
 - **A run never picks up a file of an earlier run.** The source collected the
   slide images with `sorted(glob("slide-*.png"))`, and `pdftoppm` pads the page
   number to the digit width of the document, so a 12 slide run left

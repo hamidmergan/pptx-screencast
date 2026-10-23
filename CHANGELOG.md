@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A retry of the recogniser is decided from the status code alone, never from the message text.
 - The corrected copy of the deck is written into the work folder, so a deck on a read-only share renders as well.
 - A path with a quote, a colon or an equal sign in it is escaped for both levels ffmpeg reads a filter at.
+- A quote in a folder name no longer breaks the ffmpeg concat list.
 - Burned-in cues are no longer also added as a separate subtitle track.
 
 [0.1.0]: https://github.com/hamidmergan/pptx-screencast/releases/tag/v0.1.0
