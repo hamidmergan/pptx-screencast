@@ -15,7 +15,7 @@ from typing import Callable, List, Optional, Sequence, Union
 from . import config
 from .audio import speak_all
 from .client import make_stt_client
-from .errors import ScreencastError, SlideError
+from .errors import ScreencastError, SlideError, VideoError
 from .generation import (
     check_count,
     generate_all_scripts,
@@ -263,10 +263,13 @@ def make_video(
             subtitle_path=track,
             subtitle_lang=vtt_language_code(translate or resolved.language),
         )
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(data)
-        if track is not None:
-            _write_subtitle_files(track, target)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            if track is not None:
+                _write_subtitle_files(track, target)
+        except OSError as exc:
+            raise VideoError(f"The video could not be written to {target}: {exc}")
         _report(progress, "join", 1, 1)
     return target
 

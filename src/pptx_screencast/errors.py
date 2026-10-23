@@ -23,4 +23,4 @@ class ModelError(ScreencastError):
 
 
 class VideoError(ScreencastError):
-    """ffmpeg could not build the video."""
+    """ffmpeg could not build the video, or it could not be written."""

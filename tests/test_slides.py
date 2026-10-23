@@ -4,6 +4,8 @@ import subprocess
 from io import BytesIO
 from pathlib import Path
 
+import pytest
+
 from pptx import Presentation
 from pptx.oxml.ns import qn
 
@@ -292,3 +294,59 @@ def test_the_images_come_back_in_page_order(sample_deck, tmp_path, monkeypatch):
     _fake_render(monkeypatch, 12)
     images = pptx_to_images(sample_deck, tmp_path / "images", dpi=50)
     assert [p.name for p in images] == [f"slide-{i:02d}.png" for i in range(1, 13)]
+
+
+def test_a_stuck_libreoffice_is_a_slide_error(sample_deck, tmp_path, monkeypatch):
+    from pptx_screencast import slides as module
+    from pptx_screencast.errors import SlideError
+
+    deck = tmp_path / "deck.pptx"
+    deck.write_bytes(sample_deck.read_bytes())
+
+    def _timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=["soffice"], timeout=1)
+
+    monkeypatch.setattr(module.subprocess, "run", _timeout)
+    monkeypatch.setattr(module, "find_soffice", lambda: "/usr/bin/soffice")
+    with pytest.raises(SlideError) as info:
+        module.pptx_to_images(deck, tmp_path / "images", dpi=50)
+    assert "did not finish" in str(info.value)
+
+
+def test_a_missing_libreoffice_is_a_slide_error(sample_deck, tmp_path, monkeypatch):
+    from pptx_screencast import slides as module
+    from pptx_screencast.errors import SlideError
+
+    deck = tmp_path / "deck.pptx"
+    deck.write_bytes(sample_deck.read_bytes())
+
+    def _missing(*args, **kwargs):
+        raise FileNotFoundError("soffice")
+
+    monkeypatch.setattr(module.subprocess, "run", _missing)
+    monkeypatch.setattr(module, "find_soffice", lambda: "/usr/bin/soffice")
+    with pytest.raises(SlideError):
+        module.pptx_to_images(deck, tmp_path / "images", dpi=50)
+
+
+def test_an_unwritable_folder_for_the_render_copy_is_a_slide_error(sample_deck, tmp_path):
+    from pptx_screencast.errors import SlideError
+
+    folder = tmp_path / "readonly"
+    folder.mkdir()
+    deck = folder / "deck.pptx"
+    deck.write_bytes(sample_deck.read_bytes())
+    folder.chmod(0o500)
+    try:
+        with pytest.raises(SlideError) as info:
+            _apply_autofit_for_rendering(deck)
+        assert "could not be written" in str(info.value)
+    finally:
+        folder.chmod(0o700)
+
+
+def test_libreoffice_gets_minutes_and_not_seconds():
+    """A deck of a hundred slides with large pictures takes minutes."""
+    from pptx_screencast import slides as module
+
+    assert module.SOFFICE_TIMEOUT >= 600

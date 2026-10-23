@@ -33,6 +33,22 @@ logger = logging.getLogger(__name__)
 EMU_PER_PT = 12700
 _DEFAULT_TEXT_INSET_EMU = 91440  # OOXML default lIns/rIns when the bodyPr omits them
 
+# Seconds the rendering steps may take. LibreOffice needs the most: a deck
+# with a hundred slides and large pictures takes minutes, not seconds.
+SOFFICE_TIMEOUT = 600
+PDFINFO_TIMEOUT = 60
+PDFTOPPM_TIMEOUT = 120
+
+
+def _run(cmd: list[str], timeout: int, what: str) -> subprocess.CompletedProcess:
+    """Run a rendering tool, every system failure leaves as a SlideError."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise SlideError(f"{what} did not finish within {timeout} seconds.")
+    except OSError as exc:
+        raise SlideError(f"{what} could not be started: {exc}")
+
 
 def extract_text_per_slide(source: bytes | str | Path) -> list[str]:
     """Text per visible slide, hidden ones stay out."""
@@ -345,7 +361,12 @@ def _apply_autofit_for_rendering(pptx_path: Path) -> Path:
     overflow_fixed = _fix_overflowing_spautofit_text(prs)
 
     render_path = pptx_path.parent / f"_render_{pptx_path.name}"
-    prs.save(str(render_path))
+    try:
+        prs.save(str(render_path))
+    except OSError as exc:
+        raise SlideError(
+            f"The corrected copy of the deck could not be written to {render_path}: {exc}"
+        )
     logger.info(
         "AutoFit corrections applied: shrunk=%s, linebreaks=%s, line_spacing=%s, overflow=%s",
         changed, linebreaks_fixed, line_spacing_fixed, overflow_fixed,
@@ -371,7 +392,7 @@ def pptx_to_images(
     try:
         cmd = build_soffice_cmd(render_pptx, output_dir)
         logger.info("Converting the deck to PDF: %s", " ".join(cmd))
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = _run(cmd, SOFFICE_TIMEOUT, "LibreOffice")
     finally:
         # Clear the copy away, otherwise the folder stays behind after pre-rendering.
         render_pptx.unlink(missing_ok=True)
@@ -386,8 +407,8 @@ def pptx_to_images(
         logger.warning("LibreOffice exited with rc=%s but wrote the PDF anyway: %s", result.returncode, result.stderr[:200])
 
     # Get page count via pdfinfo
-    pdfinfo_result = subprocess.run(
-        ["pdfinfo", str(pdf_path)], capture_output=True, text=True, timeout=30
+    pdfinfo_result = _run(
+        ["pdfinfo", str(pdf_path)], PDFINFO_TIMEOUT, "Counting the pages of the PDF"
     )
     page_count = 1
     for line in pdfinfo_result.stdout.splitlines():
@@ -414,7 +435,7 @@ def pptx_to_images(
             "-f", str(page), "-l", str(page),
             str(pdf_path), str(prefix),
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = _run(cmd, PDFTOPPM_TIMEOUT, f"Rendering page {page}")
         if result.returncode != 0:
             raise SlideError(f"Page {page} could not be rendered: {result.stderr[:200]}")
         made = sorted(output_dir.glob(f"{prefix.name}*.png"))

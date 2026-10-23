@@ -22,6 +22,37 @@ _FRAME_RATE = 5
 # Seconds a slide without narration stays on screen.
 SILENT_DURATION = 3.0
 
+# Seconds the single steps may take. A run that takes longer is stuck, and a
+# stuck ffmpeg has to end as a VideoError and not as a traceback.
+PROBE_TIMEOUT = 60
+CLIP_TIMEOUT = 300
+PAUSE_TIMEOUT = 30
+SPEED_TIMEOUT = 120
+CONCAT_TIMEOUT = 300
+FILTER_LIST_TIMEOUT = 30
+BURN_IN_TIMEOUT = 1800
+FASTSTART_TIMEOUT = 600
+
+
+def _run(cmd: List[str], timeout: int, what: str) -> subprocess.CompletedProcess:
+    """Run ffmpeg or ffprobe, every system failure leaves as a VideoError."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise VideoError(f"{what} did not finish within {timeout} seconds.")
+    except OSError as exc:
+        raise VideoError(f"{what} could not be started: {exc}")
+
+
+def _proc(
+    cmd: List[str], timeout: int, run_id: Optional[str], what: str
+) -> subprocess.CompletedProcess:
+    """The same for the calls that run in their own session."""
+    try:
+        return run_proc(cmd, timeout=timeout, run_id=run_id)
+    except OSError as exc:
+        raise VideoError(f"{what} could not be started: {exc}")
+
 
 def get_audio_duration(audio_path: Optional[Path]) -> float:
     """Audio length in seconds from the counted packets, 3.0 for silent slides."""
@@ -34,7 +65,7 @@ def get_audio_duration(audio_path: Optional[Path]) -> float:
         "-of", "csv=p=0",
         str(audio_path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    result = _run(cmd, PROBE_TIMEOUT, "Measuring the audio length")
     if result.returncode != 0:
         raise VideoError(f"ffprobe failed: {result.stderr[:200]}")
     total = 0.0
@@ -56,7 +87,7 @@ def get_video_duration(video_path: Path) -> float:
         "-of", "csv=p=0",
         str(video_path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    result = _run(cmd, PROBE_TIMEOUT, "Measuring the clip length")
     if result.returncode != 0:
         raise VideoError(f"ffprobe failed: {result.stderr[:200]}")
     try:
@@ -73,7 +104,7 @@ def apply_speed(audio_path: Path, output_path: Path, speed: float, run_id: Optio
         "-filter:a", f"atempo={speed}",
         "-c:a", "libmp3lame", "-q:a", "2", str(stretched),
     ]
-    result = run_proc(cmd, timeout=120, run_id=run_id)
+    result = _proc(cmd, SPEED_TIMEOUT, run_id, "Changing the speed")
     if result.returncode != 0:
         logger.warning(
             "Speed %s cannot be applied, taking the audio as it is: %s",
@@ -118,7 +149,7 @@ def create_slide_video(
             "-shortest",
             str(output_path),
         ]
-        result = run_proc(cmd, timeout=300, run_id=run_id)
+        result = _proc(cmd, CLIP_TIMEOUT, run_id, "Building the silent clip")
         if result.returncode != 0:
             logger.error("The clip could not be built (rc=%s): %s", result.returncode, result.stderr[-500:])
             raise VideoError(f"The silent clip could not be built: {result.stderr[-300:]}")
@@ -139,7 +170,9 @@ def create_slide_video(
             "-ac", "2", "-ar", "44100",
             "-c:a", "libmp3lame", str(silence_path),
         ]
-        run_proc(cmd_silence, timeout=30, run_id=run_id)
+        silence = _proc(cmd_silence, PAUSE_TIMEOUT, run_id, "Making the pause")
+        if silence.returncode != 0:
+            raise VideoError(f"The pause could not be made: {silence.stderr[-300:]}")
 
         audio_with_pause_path = output_path.with_suffix(".paused.mp3")
         concat_audio_file = output_path.with_suffix(".audiolist.txt")
@@ -152,7 +185,11 @@ def create_slide_video(
             "-i", str(concat_audio_file),
             "-c", "copy", str(audio_with_pause_path),
         ]
-        run_proc(cmd_concat, timeout=30, run_id=run_id)
+        joined = _proc(cmd_concat, PAUSE_TIMEOUT, run_id, "Putting the pause behind the narration")
+        if joined.returncode != 0:
+            raise VideoError(
+                f"The pause could not be put behind the narration: {joined.stderr[-300:]}"
+            )
         final_audio = audio_with_pause_path
         image_duration = duration + pause + _IMAGE_RESERVE
     else:
@@ -171,7 +208,7 @@ def create_slide_video(
         "-shortest",
         str(output_path),
     ]
-    result = run_proc(cmd, timeout=300, run_id=run_id)
+    result = _proc(cmd, CLIP_TIMEOUT, run_id, "Building the clip")
     if result.returncode != 0:
         logger.error("The clip could not be built (rc=%s): %s", result.returncode, result.stderr[-500:])
         raise VideoError(f"The clip could not be built: {result.stderr[-300:]}")
@@ -191,7 +228,7 @@ def concatenate_videos(video_paths: List[Path], output_path: Path) -> None:
         "-c", "copy",
         str(output_path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    result = _run(cmd, CONCAT_TIMEOUT, "Joining the clips")
     if result.returncode != 0:
         logger.error("The clips could not be joined: %s", result.stderr[:300])
         raise VideoError(f"The clips could not be joined: {result.stderr[:200]}")
@@ -215,7 +252,7 @@ def has_burn_in_support() -> bool:
     try:
         result = subprocess.run(
             ["ffmpeg", "-hide_banner", "-filters"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=FILTER_LIST_TIMEOUT,
         )
     except (OSError, subprocess.SubprocessError):
         return False
@@ -239,7 +276,12 @@ def burn_in_subtitles(
         "-pix_fmt", "yuv420p", "-c:a", "copy",
         str(output_path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    try:
+        result = _run(cmd, BURN_IN_TIMEOUT, "Burning the subtitles in")
+    except VideoError as exc:
+        # The cues stay in their own track, which is a video the user can watch.
+        logger.warning("The subtitles could not be burned in: %s", exc)
+        return input_path
     if result.returncode != 0:
         logger.warning(
             "The subtitles could not be burned in, the video keeps its own track: %s",
@@ -269,8 +311,20 @@ def apply_faststart(
     if notice:
         cmd += ["-metadata", f"comment={notice}"]
     cmd += ["-c:v", "copy", "-c:a", "copy", "-movflags", "+faststart", str(output_path)]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    try:
+        result = _run(cmd, FASTSTART_TIMEOUT, "The faststart pass")
+    except VideoError as exc:
+        # Faststart is for streaming only, the file itself plays without it.
+        logger.warning("The faststart pass failed: %s", exc)
+        return _read(input_path)
     if result.returncode != 0:
         logger.warning("The faststart pass failed (rc=%s): %s", result.returncode, result.stderr[:300])
-        return input_path.read_bytes()
-    return output_path.read_bytes()
+        return _read(input_path)
+    return _read(output_path)
+
+
+def _read(path: Path) -> bytes:
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        raise VideoError(f"The finished video could not be read from {path}: {exc}")

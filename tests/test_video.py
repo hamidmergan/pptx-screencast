@@ -183,3 +183,85 @@ def test_without_a_frame_rate_the_default_is_used(tmp_path, slide_image, speech)
     clip = tmp_path / "clip.mp4"
     module.create_slide_video(slide_image, speech, clip)
     assert _frame_rate(clip) == f"{module._FRAME_RATE}/1"
+
+
+# -- A stuck or missing program stays inside the error contract --
+
+def test_a_stuck_probe_is_a_video_error(tmp_path, speech, monkeypatch):
+    def _timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=["ffprobe"], timeout=1)
+
+    monkeypatch.setattr(module.subprocess, "run", _timeout)
+    with pytest.raises(VideoError) as info:
+        module.get_audio_duration(speech)
+    assert "did not finish" in str(info.value)
+
+
+def test_a_missing_ffprobe_is_a_video_error(tmp_path, speech, monkeypatch):
+    def _missing(*args, **kwargs):
+        raise FileNotFoundError("ffprobe")
+
+    monkeypatch.setattr(module.subprocess, "run", _missing)
+    with pytest.raises(VideoError):
+        module.get_video_duration(tmp_path / "anything.mp4")
+
+
+def test_a_stuck_join_is_a_video_error(tmp_path, monkeypatch):
+    def _timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=["ffmpeg"], timeout=1)
+
+    monkeypatch.setattr(module.subprocess, "run", _timeout)
+    with pytest.raises(VideoError):
+        module.concatenate_videos([tmp_path / "a.mp4"], tmp_path / "joined.mp4")
+
+
+def test_a_missing_ffmpeg_for_a_clip_is_a_video_error(tmp_path, slide_image, monkeypatch):
+    def _missing(*args, **kwargs):
+        raise FileNotFoundError("ffmpeg")
+
+    monkeypatch.setattr(module, "run_proc", _missing)
+    with pytest.raises(VideoError):
+        module.create_slide_video(slide_image, None, tmp_path / "clip.mp4")
+
+
+def test_a_failed_pause_is_reported_and_not_left_to_the_next_step(
+    tmp_path, slide_image, speech, monkeypatch
+):
+    """A silent failure here used to surface as a missing input file later on."""
+    real = module.run_proc
+
+    def _fail(cmd, timeout, run_id=None):
+        if "anullsrc=r=44100:cl=stereo" in cmd:
+            return subprocess.CompletedProcess(cmd, 1, "", "no such filter")
+        return real(cmd, timeout=timeout, run_id=run_id)
+
+    monkeypatch.setattr(module, "run_proc", _fail)
+    with pytest.raises(VideoError) as info:
+        module.create_slide_video(slide_image, speech, tmp_path / "clip.mp4", pause=1.0)
+    assert "pause" in str(info.value)
+
+
+def test_a_stuck_faststart_keeps_the_video(tmp_path, slide_image, speech, monkeypatch):
+    clip = tmp_path / "clip.mp4"
+    module.create_slide_video(slide_image, speech, clip)
+
+    def _timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=["ffmpeg"], timeout=1)
+
+    monkeypatch.setattr(module.subprocess, "run", _timeout)
+    data = module.apply_faststart(clip, tmp_path / "final.mp4")
+    assert data == clip.read_bytes()
+
+
+def test_a_stuck_burn_in_keeps_the_video(tmp_path, slide_image, speech, monkeypatch):
+    clip = tmp_path / "clip.mp4"
+    module.create_slide_video(slide_image, speech, clip)
+    track = tmp_path / "subtitles.srt"
+    track.write_text("1\n00:00:00,000 --> 00:00:02,000\nHello\n", encoding="utf-8")
+    monkeypatch.setattr(module, "has_burn_in_support", lambda: True)
+
+    def _timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=["ffmpeg"], timeout=1)
+
+    monkeypatch.setattr(module.subprocess, "run", _timeout)
+    assert module.burn_in_subtitles(clip, track, tmp_path / "burned.mp4") == clip
