@@ -375,3 +375,17 @@ def test_one_worker_still_cuts_every_clip(deck, server, tmp_path, no_libreoffice
     assert sorted(p.name for p in work.glob("clip_0*.mp4")) == [
         f"clip_{i:03d}.mp4" for i in range(4)
     ]
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_the_speak_step_counts_only_the_chosen_slides(deck, server, tmp_path, no_libreoffice):
+    """The progress bar of the page must not jump backwards or claim too many."""
+    seen = []
+    core.make_video(
+        deck, tmp_path / "deck.mp4", slides=[0, 2],
+        progress=lambda step, done, total: seen.append((step, done, total)),
+        **_options(server),
+    )
+    speak = [row for row in seen if row[0] == "speak"]
+    assert [row[2] for row in speak] == [2] * len(speak)
+    assert [row[1] for row in speak] == [0, 1, 2]

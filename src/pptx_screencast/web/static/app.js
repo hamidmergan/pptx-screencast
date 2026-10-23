@@ -55,6 +55,8 @@ async function loadInfo() {
   $("speed").value = info.speed;
   $("slide-pause").value = info.slide_pause;
   $("resolution").value = String(info.resolution);
+  $("subtitles").checked = Boolean(info.subtitles);
+  $("burn-in").checked = Boolean(info.burn_in);
   if (info.has_key) $("api-key").placeholder = "set on the server";
   if (info.missing_tools && info.missing_tools.length) {
     fail("tools-warning",
@@ -243,8 +245,9 @@ $("render").addEventListener("click", async () => {
   form.append("slide_pause", $("slide-pause").value);
   form.append("resolution", $("resolution").value);
   form.append("slides", $("slides").value);
-  if ($("subtitles").checked) form.append("subtitles", "on");
-  if ($("burn-in").checked) form.append("burn_in", "on");
+  // Always explicit, so an unticked box really switches the option off.
+  form.append("subtitles", $("subtitles").checked ? "on" : "off");
+  form.append("burn_in", $("burn-in").checked ? "on" : "off");
   serverFields(form);
   form.append("tts_base_url", $("tts-base-url").value);
   form.append("tts_model", $("tts-model").value);

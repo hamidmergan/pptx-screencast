@@ -294,3 +294,87 @@ def test_only_one_job_runs_at_a_time(client, deck_bytes, server):
     # one is simply accepted again.
     assert second.status_code in (200, 409)
     _wait(client)
+
+
+# -- The environment of the server against the choices on the page --
+
+def test_the_info_passes_the_environment_on(server, monkeypatch):
+    """An operator who sets a default in the compose file must see it on the page."""
+    from pptx_screencast import config
+
+    monkeypatch.setenv("PPTX_SCREENCAST_SLIDE_PAUSE", "2.5")
+    monkeypatch.setenv("PPTX_SCREENCAST_RESOLUTION", "150")
+    monkeypatch.setenv("PPTX_SCREENCAST_SUBTITLES", "true")
+    monkeypatch.setenv("PPTX_SCREENCAST_BURN_IN", "true")
+    app = create_app(config.env_defaults())
+    with TestClient(app) as page:
+        info = page.get("/api/info").json()
+    assert info["slide_pause"] == 2.5
+    assert info["resolution"] == 150
+    assert info["subtitles"] is True
+    assert info["burn_in"] is True
+
+
+def test_without_the_environment_the_info_names_the_plain_defaults(client):
+    from pptx_screencast import config
+
+    info = client.get("/api/info").json()
+    assert info["slide_pause"] == config.SLIDE_PAUSE
+    assert info["resolution"] == config.RESOLUTION
+    assert info["subtitles"] is False
+    assert info["burn_in"] is False
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_an_unticked_box_switches_the_subtitles_off(server, deck_bytes, no_libreoffice, monkeypatch):
+    """The environment says on, the page says off, and off has to win."""
+    from pptx_screencast import config
+
+    monkeypatch.setenv("PPTX_SCREENCAST_SUBTITLES", "true")
+    app = create_app(dict(config.env_defaults(), base_url=server.base_url, model="chat"))
+    with TestClient(app) as page:
+        _upload(page, deck_bytes, source="notes")
+        _wait(page)
+        page.post(
+            "/api/render",
+            data={"scripts": ["One sentence.", "", "Three."], "voice": "alloy",
+                  "tts_model": "tts", "stt_model": "whisper", "subtitles": "off"},
+        )
+        job = _wait(page, 60)
+        assert job["state"] == "done", job["error"]
+        assert not job["has_subtitles"]
+    assert server.count("transcribe") == 0
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_a_box_the_page_says_nothing_about_keeps_the_environment(
+    server, deck_bytes, no_libreoffice, monkeypatch
+):
+    """An older page that sends no field at all still gets the server default."""
+    from pptx_screencast import config
+
+    monkeypatch.setenv("PPTX_SCREENCAST_SUBTITLES", "true")
+    app = create_app(dict(config.env_defaults(), base_url=server.base_url, model="chat"))
+    with TestClient(app) as page:
+        _upload(page, deck_bytes, source="notes")
+        _wait(page)
+        page.post(
+            "/api/render",
+            data={"scripts": ["One sentence.", "", "Three."], "voice": "alloy",
+                  "tts_model": "tts", "stt_model": "whisper"},
+        )
+        job = _wait(page, 60)
+        assert job["state"] == "done", job["error"]
+        assert job["has_subtitles"]
+
+
+def test_the_page_always_says_what_the_boxes_are():
+    """The script has to send an explicit value, not leave the field out."""
+    from pathlib import Path
+
+    from pptx_screencast.web import app as web_app
+
+    script = (Path(web_app.__file__).parent / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'form.append("subtitles", $("subtitles").checked ? "on" : "off");' in script
+    assert 'form.append("burn_in", $("burn-in").checked ? "on" : "off");' in script
+    assert 'info.subtitles' in script and 'info.burn_in' in script

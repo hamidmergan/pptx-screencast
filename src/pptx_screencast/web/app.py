@@ -136,6 +136,19 @@ def create_app(
                 chosen[key] = value
         return {k: v for k, v in chosen.items() if v is not None}
 
+    def _switch(raw: str) -> Optional[bool]:
+        """A checkbox of the page: on, off, or nothing said at all.
+
+        An unticked box has to send `off`, otherwise a default from the
+        environment would switch the option back on behind the user's back.
+        """
+        value = raw.strip().lower()
+        if value in ("on", "true", "1", "yes"):
+            return True
+        if value in ("off", "false", "0", "no"):
+            return False
+        return None
+
     def _number(raw: str, label: str) -> Optional[float]:
         if not raw.strip():
             return None
@@ -301,8 +314,8 @@ def create_app(
             "tts_base_url": tts_base_url, "tts_model": tts_model, "tts_api_key": tts_api_key,
             "stt_base_url": stt_base_url, "stt_model": stt_model, "stt_api_key": stt_api_key,
             "voice": voice, "language": language,
-            "subtitles": subtitles == "on" or None,
-            "burn_in": burn_in == "on" or None,
+            "subtitles": _switch(subtitles),
+            "burn_in": _switch(burn_in),
         })
         for key, raw, label in (("speed", speed, "Speed"),
                                 ("slide_pause", slide_pause, "The pause"),
@@ -355,8 +368,10 @@ def create_app(
             "voice": defaults.get("voice", ""),
             "language": defaults.get("language", config.LANGUAGE),
             "speed": defaults.get("speed", config.SPEED),
-            "slide_pause": config.SLIDE_PAUSE,
-            "resolution": config.RESOLUTION,
+            "slide_pause": defaults.get("slide_pause", config.SLIDE_PAUSE),
+            "resolution": defaults.get("resolution", config.RESOLUTION),
+            "subtitles": bool(defaults.get("subtitles", False)),
+            "burn_in": bool(defaults.get("burn_in", False)),
             "has_key": bool(defaults.get("api_key")),
             "max_upload_mb": MAX_UPLOAD_MB,
             "max_slides": config.MAX_SLIDES,
