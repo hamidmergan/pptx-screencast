@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pptx-screencast"
+version = "0.1.0"
+description = "Turn a PowerPoint deck into a narrated screencast with any OpenAI-compatible model server"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Hamid Mergan" }]
+keywords = ["pptx", "powerpoint", "screencast", "video", "narration", "tts", "subtitles", "openai", "ollama"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Typing :: Typed",
+]
+dependencies = [
+    "openai>=1.30",
+    "doc2speech>=0.1.0",
+    "python-pptx>=0.6.21",
+    "Pillow>=9.0",
+]
+
+[project.optional-dependencies]
+ui = ["fastapi>=0.100", "uvicorn>=0.23", "python-multipart>=0.0.6"]
+test = ["pytest>=7", "httpx>=0.24", "fastapi>=0.100", "uvicorn>=0.23", "python-multipart>=0.0.6"]
+dev = ["pytest>=7", "httpx>=0.24", "fastapi>=0.100", "uvicorn>=0.23", "python-multipart>=0.0.6", "build", "twine"]
+
+[project.urls]
+Homepage = "https://github.com/hamidmergan/pptx-screencast"
+Source = "https://github.com/hamidmergan/pptx-screencast"
+Issues = "https://github.com/hamidmergan/pptx-screencast/issues"
+Changelog = "https://github.com/hamidmergan/pptx-screencast/blob/main/CHANGELOG.md"
+
+[project.scripts]
+pptx-screencast = "pptx_screencast.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pptx_screencast = ["py.typed", "web/static/*", "assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
