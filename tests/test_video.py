@@ -265,3 +265,49 @@ def test_a_stuck_burn_in_keeps_the_video(tmp_path, slide_image, speech, monkeypa
 
     monkeypatch.setattr(module.subprocess, "run", _timeout)
     assert module.burn_in_subtitles(clip, track, tmp_path / "burned.mp4") == clip
+
+
+# -- Escaping a path for the burn-in filter --
+
+@pytest.mark.parametrize("name, escaped", [
+    ("o'brien", r"o\\\'brien"),
+    ("c:x", r"c\\:x"),
+    ("eq=uals", r"eq\\=uals"),
+    ("my deck, final", r"my deck\, final"),
+    ("semi;colon", r"semi\;colon"),
+    ("br[ack]et", r"br\[ack\]et"),
+    ("back\\slash", r"back\\\\slash"),
+    ("plain", "plain"),
+])
+def test_a_path_is_escaped_for_both_levels_of_the_filter(name, escaped):
+    """ffmpeg takes the description apart twice, so a colon needs two backslashes."""
+    assert module._escape_filter_path(Path("/x") / name / "s.vtt") == f"/x/{escaped}/s.vtt"
+
+
+@pytest.mark.skipif(
+    not module.has_burn_in_support(), reason="this ffmpeg has no subtitles filter"
+)
+def test_a_folder_with_a_quote_in_its_name_can_be_burned_in(tmp_path, slide_image, speech):
+    folder = tmp_path / "o'brien talks"
+    folder.mkdir()
+    clip = folder / "clip.mp4"
+    module.create_slide_video(slide_image, speech, clip)
+    track = folder / "subtitles.srt"
+    track.write_text("1\n00:00:00,000 --> 00:00:02,000\nHello\n", encoding="utf-8")
+    burned = folder / "burned.mp4"
+    assert module.burn_in_subtitles(clip, track, burned) == burned
+
+
+def test_the_escaped_path_really_opens_in_a_filter(tmp_path, slide_image, speech):
+    """The same two levels, measured against a filter this ffmpeg does have."""
+    folder = tmp_path / "o'brien, c:x"
+    folder.mkdir()
+    clip = folder / "clip.mp4"
+    module.create_slide_video(slide_image, speech, clip)
+    result = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-v", "error", "-f", "lavfi",
+         "-i", f"movie=filename={module._escape_filter_path(clip)}",
+         "-frames:v", "1", "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr[-300:]

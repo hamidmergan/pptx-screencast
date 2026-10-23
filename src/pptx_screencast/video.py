@@ -234,10 +234,27 @@ def concatenate_videos(video_paths: List[Path], output_path: Path) -> None:
         raise VideoError(f"The clips could not be joined: {result.stderr[:200]}")
 
 
+# The filter's own option parser reads these, so they need the inner level.
+_OPTION_SPECIAL = ("\\", ":", "=", "'")
+
+# The filter graph around it reads these, which is the outer level.
+_GRAPH_SPECIAL = ("\\", "'", "[", "]", ",", ";")
+
+
 def _escape_filter_path(path: Path) -> str:
-    """A path the way the ffmpeg filter graph wants to read it."""
+    """A path the way the ffmpeg filter graph wants to read it.
+
+    ffmpeg takes a filter description apart twice. The graph parser splits on
+    the commas and semicolons and reads the brackets and the quoting, then the
+    filter's option parser splits the rest on the colons and equal signs and
+    reads the quoting again. A colon in a path therefore has to arrive as two
+    backslashes and a colon, and a quote as three backslashes and a quote.
+    Measured against real ffmpeg with paths holding each of these characters.
+    """
     text = str(path)
-    for char in ("\\", ":", "'", "[", "]", ",", ";"):
+    for char in _OPTION_SPECIAL:
+        text = text.replace(char, "\\" + char)
+    for char in _GRAPH_SPECIAL:
         text = text.replace(char, "\\" + char)
     return text
 
