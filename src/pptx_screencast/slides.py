@@ -318,9 +318,16 @@ def _fix_overflowing_spautofit_text(prs: Presentation, tolerance: float = 1.05, 
     return changed
 
 
-def _apply_autofit_for_rendering(pptx_path: Path) -> Path:
+def _apply_autofit_for_rendering(
+    pptx_path: Path, target_dir: Path | None = None
+) -> Path:
     """A temp copy with normAutofit text shrunk by 20 percent and genuinely
-    overflowing spAutoFit text shrunk just enough to fit, the original stays."""
+    overflowing spAutoFit text shrunk just enough to fit, the original stays.
+
+    The copy goes into `target_dir`, the work folder of the run. Without one
+    it lands next to the deck, which only works if that folder can be written
+    to, so every caller inside this package passes one.
+    """
     prs = Presentation(str(pptx_path))
     linebreaks_fixed = _fix_broken_linebreak_runs(prs)
     line_spacing_fixed = _fix_tight_line_spacing(prs)
@@ -360,7 +367,9 @@ def _apply_autofit_for_rendering(pptx_path: Path) -> Path:
 
     overflow_fixed = _fix_overflowing_spautofit_text(prs)
 
-    render_path = pptx_path.parent / f"_render_{pptx_path.name}"
+    folder = Path(target_dir) if target_dir is not None else pptx_path.parent
+    folder.mkdir(parents=True, exist_ok=True)
+    render_path = folder / f"_render_{pptx_path.name}"
     try:
         prs.save(str(render_path))
     except OSError as exc:
@@ -377,7 +386,12 @@ def _apply_autofit_for_rendering(pptx_path: Path) -> Path:
 def pptx_to_images(
     pptx_path: Path, output_dir: Path, dpi: int = 100, max_workers: int = 4
 ) -> list[Path]:
-    """Render every visible slide of the deck to a PNG with LibreOffice."""
+    """Render every visible slide of the deck to a PNG with LibreOffice.
+
+    Everything this makes stays inside `output_dir`, the deck's own folder is
+    only read, so a deck on a read-only share renders as well.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
     # Reads the real slide dimensions so the aspect ratio is right.
     prs = Presentation(str(pptx_path))
     slide_width = prs.slide_width   # EMU (1 cm = 360000 EMU)
@@ -387,7 +401,7 @@ def pptx_to_images(
     slide_ratio = slide_width / slide_height
     logger.info("Slide size: %.2fx%.2f cm (ratio %.4f)", width_cm, height_cm, slide_ratio)
 
-    render_pptx = _apply_autofit_for_rendering(pptx_path)
+    render_pptx = _apply_autofit_for_rendering(pptx_path, output_dir)
 
     try:
         cmd = build_soffice_cmd(render_pptx, output_dir)

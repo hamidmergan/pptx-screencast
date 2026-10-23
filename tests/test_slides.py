@@ -350,3 +350,29 @@ def test_libreoffice_gets_minutes_and_not_seconds():
     from pptx_screencast import slides as module
 
     assert module.SOFFICE_TIMEOUT >= 600
+
+
+def test_the_render_copy_goes_into_the_work_folder(sample_deck, tmp_path):
+    work = tmp_path / "work"
+    render_path = _apply_autofit_for_rendering(sample_deck, work)
+    assert render_path.parent == work
+    assert render_path.exists()
+    assert not (sample_deck.parent / f"_render_{sample_deck.name}").exists()
+
+
+def test_a_deck_on_a_read_only_folder_still_renders(sample_deck, tmp_path, monkeypatch):
+    """The copy used to land next to the deck, which fails on a mounted share."""
+    from pptx_screencast.slides import pptx_to_images
+
+    share = tmp_path / "share"
+    share.mkdir()
+    deck = share / "deck.pptx"
+    deck.write_bytes(sample_deck.read_bytes())
+    share.chmod(0o500)
+    try:
+        _fake_render(monkeypatch, 4)
+        images = pptx_to_images(deck, tmp_path / "images", dpi=50)
+        assert len(images) == 4
+        assert sorted(p.name for p in share.iterdir()) == ["deck.pptx"]
+    finally:
+        share.chmod(0o700)
