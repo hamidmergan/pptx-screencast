@@ -162,7 +162,9 @@ def _notice_clip(
         picture = tmp / "notice.png"
         clip = tmp / "clip_notice.mp4"
         create_outro_image(width, height, picture)
-        create_slide_video(picture, None, clip, pause=0.0, crf=settings.crf)
+        create_slide_video(
+            picture, None, clip, pause=0.0, crf=settings.crf, fps=settings.fps
+        )
         return clip
     except Exception as e:
         logger.warning("The notice slide could not be made, the video runs without it: %s", e)
@@ -237,6 +239,7 @@ def make_video(
             create_slide_video(
                 images[index], audio_paths[index], clip,
                 pause=resolved.slide_pause, crf=resolved.crf, speed=resolved.speed,
+                fps=resolved.fps,
             )
             _report(progress, "video", done, total_clips)
 

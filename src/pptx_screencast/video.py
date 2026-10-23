@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 # Padding on the image length so the audio and not the image decides the end.
 _IMAGE_RESERVE = 2.0
 
-# Frames per second for the still, at 1 a slide under a second gets no frame at all.
+# Frames per second for the still, at 1 a slide under a second gets no frame
+# at all. The default of the `fps` setting, which every caller may override.
 _FRAME_RATE = 5
 
 # Seconds a slide without narration stays on screen.
@@ -91,8 +92,14 @@ def create_slide_video(
     run_id: Optional[str] = None,
     silent_duration: float = SILENT_DURATION,
     speed: float = 1.0,
+    fps: int = _FRAME_RATE,
 ) -> None:
-    """Assemble a slide image with its audio into a clip."""
+    """Assemble a slide image with its audio into a clip.
+
+    `fps` is the frame rate of the still picture. More frames make scrubbing
+    smoother and the file bigger, the picture itself does not change.
+    """
+    fps = max(1, int(fps or _FRAME_RATE))
     # Missing and empty audio files count the same as None, the slide stays silent.
     if audio_path is not None and (not audio_path.exists() or audio_path.stat().st_size == 0):
         logger.warning("The audio file %s is empty or missing, the slide stays silent", audio_path)
@@ -101,7 +108,7 @@ def create_slide_video(
     if audio_path is None:
         cmd = [
             "ffmpeg", "-y",
-            "-loop", "1", "-framerate", str(_FRAME_RATE), "-i", str(image_path),
+            "-loop", "1", "-framerate", str(fps), "-i", str(image_path),
             "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
             "-t", str(silent_duration),
             "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
@@ -155,7 +162,7 @@ def create_slide_video(
     # -t only bounds the image, -shortest ends the clip at the end of the audio.
     cmd = [
         "ffmpeg", "-y",
-        "-loop", "1", "-framerate", str(_FRAME_RATE), "-t", str(image_duration), "-i", str(image_path),
+        "-loop", "1", "-framerate", str(fps), "-t", str(image_duration), "-i", str(image_path),
         "-i", str(final_audio),
         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         "-c:v", "libx264", "-tune", "stillimage", "-preset", "ultrafast",

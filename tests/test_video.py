@@ -156,3 +156,30 @@ def test_relative_clips_are_joined(tmp_path, slide_image, speech, monkeypatch):
         [Path("work/a.mp4"), Path("work/b.mp4")], Path("work/joined.mp4")
     )
     assert module.get_video_duration(tmp_path / "work/joined.mp4") == pytest.approx(4.0, abs=0.6)
+
+
+def _frame_rate(path) -> str:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True, check=True,
+    )
+    return result.stdout.strip().rstrip(",")
+
+
+def test_the_frame_rate_of_a_clip_can_be_chosen(tmp_path, slide_image, speech):
+    clip = tmp_path / "clip.mp4"
+    module.create_slide_video(slide_image, speech, clip, fps=25)
+    assert _frame_rate(clip) == "25/1"
+
+
+def test_the_frame_rate_of_a_silent_clip_can_be_chosen(tmp_path, slide_image):
+    clip = tmp_path / "clip.mp4"
+    module.create_slide_video(slide_image, None, clip, silent_duration=1.0, fps=12)
+    assert _frame_rate(clip) == "12/1"
+
+
+def test_without_a_frame_rate_the_default_is_used(tmp_path, slide_image, speech):
+    clip = tmp_path / "clip.mp4"
+    module.create_slide_video(slide_image, speech, clip)
+    assert _frame_rate(clip) == f"{module._FRAME_RATE}/1"

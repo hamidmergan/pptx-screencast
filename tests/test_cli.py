@@ -153,3 +153,18 @@ def test_the_version_is_reported(capsys):
     with pytest.raises(SystemExit):
         cli.main(["--version"])
     assert "pptx-screencast" in capsys.readouterr().out
+
+
+def test_the_fps_flag_reaches_the_settings(deck, server, tmp_path, no_libreoffice, monkeypatch):
+    seen = {}
+    real = core.config.resolve
+
+    def spy(**kwargs):
+        resolved = real(**kwargs)
+        seen["fps"] = resolved.fps
+        return resolved
+
+    monkeypatch.setattr(core.config, "resolve", spy)
+    cli.main([str(deck), "-o", str(tmp_path / "out.mp4"), "--fps", "18",
+              *_model(server), "--voice", "alloy", "--tts-model", "tts", "-q"])
+    assert seen["fps"] == 18

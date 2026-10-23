@@ -5,6 +5,8 @@ pictures, everything after it is the real code with real ffmpeg.
 """
 
 import shutil
+import subprocess
+from fractions import Fraction
 
 import pytest
 from PIL import Image
@@ -15,6 +17,15 @@ from pptx_screencast.script_file import parse_script_file, write_script_file
 from pptx_screencast.video import get_video_duration
 
 _HAS_FFMPEG = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+
+
+def _rate(path, entry: str) -> str:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", f"stream={entry}", "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True, check=True,
+    )
+    return result.stdout.strip().rstrip(",")
 
 
 @pytest.fixture
@@ -183,6 +194,19 @@ def test_a_reused_work_directory_keeps_no_file_of_the_run_before(
         f"slide-{i}.png" for i in range(1, 5)
     ]
     assert not (work / "audio" / "slide_007.mp3").exists()
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_the_fps_setting_reaches_the_clips_and_the_finished_video(
+    deck, server, tmp_path, no_libreoffice
+):
+    work = tmp_path / "work"
+    out = core.make_video(
+        deck, tmp_path / "deck.mp4", fps=20, work_dir=str(work), **_options(server)
+    )
+    assert _rate(work / "clip_000.mp4", "r_frame_rate") == "20/1"
+    assert _rate(work / "clip_notice.mp4", "r_frame_rate") == "20/1"
+    assert float(Fraction(_rate(out, "avg_frame_rate"))) == pytest.approx(20, abs=0.5)
 
 
 # -- What is refused --
