@@ -71,6 +71,14 @@ def test_missing_settings_end_in_a_clear_message(capsys, deck):
     assert "--base-url" in capsys.readouterr().err
 
 
+def test_a_broken_deck_ends_in_a_message_and_not_a_traceback(capsys, tmp_path, server):
+    broken = tmp_path / "broken.pptx"
+    broken.write_bytes(b"this is not a zip file")
+    code = cli.main([str(broken), "--script-only", *_model(server)])
+    assert code == 1
+    assert "could not be read" in capsys.readouterr().err
+
+
 def test_a_bad_slide_range_is_named(capsys, deck, server):
     code = cli.main([str(deck), "--slides", "five", *_model(server), "--voice", "alloy",
                      "--tts-model", "tts"])

@@ -202,3 +202,18 @@ def test_a_deck_over_the_limit_is_refused(deck, server, tmp_path, no_libreoffice
     with pytest.raises(SlideError) as info:
         core.make_video(deck, tmp_path / "deck.mp4", max_slides=2, **_options(server))
     assert "--slides" in str(info.value)
+
+
+def test_a_file_that_is_not_a_deck_is_reported(tmp_path, server):
+    broken = tmp_path / "broken.pptx"
+    broken.write_bytes(b"this is not a zip file")
+    with pytest.raises(SlideError) as info:
+        core.write_script(broken, base_url=server.base_url, model="chat")
+    assert "could not be read" in str(info.value)
+
+
+def test_a_file_that_is_not_a_deck_is_reported_for_the_notes_too(tmp_path, server):
+    broken = tmp_path / "broken.pptx"
+    broken.write_bytes(b"PK\x03\x04 but truncated")
+    with pytest.raises(SlideError):
+        core.write_script(broken, notes=True, base_url=server.base_url, model="chat")

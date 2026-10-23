@@ -13,7 +13,7 @@ from typing import Callable, List, Optional, Sequence, Union
 from . import config
 from .audio import speak_all
 from .client import make_stt_client
-from .errors import SlideError
+from .errors import ScreencastError, SlideError
 from .generation import (
     check_count,
     generate_all_scripts,
@@ -47,8 +47,26 @@ PathLike = Union[str, Path]
 Progress = Callable[[str, int, int], None]
 
 
+def _read_deck(read, pptx: Path) -> List[str]:
+    """Read a deck and report an unreadable file as a SlideError.
+
+    python-pptx raises a zipfile or a package error for a renamed .ppt, a
+    truncated download or an export from another program. Those are not errors
+    of this package, so the caller would see a traceback.
+    """
+    try:
+        return read(pptx)
+    except ScreencastError:
+        raise
+    except Exception as exc:
+        raise SlideError(
+            f"{pptx.name} could not be read as a PowerPoint file. "
+            f"Make sure it is a .pptx saved by PowerPoint or LibreOffice: {exc}"
+        )
+
+
 def _deck_texts(pptx: Path) -> List[str]:
-    texts = extract_text_per_slide(pptx)
+    texts = _read_deck(extract_text_per_slide, pptx)
     if not texts:
         raise SlideError(f"{pptx.name} holds no visible slide.")
     return texts
@@ -85,7 +103,7 @@ def build_scripts(
     if script is not None:
         scripts = scripts_from_file(script, total)
     elif notes:
-        scripts = scripts_from_notes(extract_notes_per_slide(pptx), total)
+        scripts = scripts_from_notes(_read_deck(extract_notes_per_slide, pptx), total)
     else:
         _report(progress, "scripts", 0, total)
         llm = make_llm(settings, client)
@@ -127,8 +145,12 @@ def write_script(
 
 
 def _slide_images(deck: Path, folder: Path, settings: config.Settings) -> List[Path]:
-    images = pptx_to_images(deck, folder, dpi=settings.resolution, max_workers=settings.max_workers)
-    return images
+    return _read_deck(
+        lambda path: pptx_to_images(
+            path, folder, dpi=settings.resolution, max_workers=settings.max_workers
+        ),
+        deck,
+    )
 
 
 def _notice_clip(
