@@ -45,8 +45,12 @@ def audio_path(tmp: Path, index: int) -> Path:
 
 
 def speak_one(script: str, settings: Settings, sleep=time.sleep) -> bytes:
-    """Voice one narration, giving a busy server up to three more tries."""
-    from doc2speech import speak
+    """Voice one narration, giving a busy server up to three more tries.
+
+    Everything doc2speech raises is a SpeechError, so nothing else can slip
+    out of here but the ModelError this package reports.
+    """
+    from doc2speech import SpeechError, speak
 
     last_error: Optional[Exception] = None
     for attempt in range(len(RETRY_DELAYS) + 1):
@@ -60,7 +64,7 @@ def speak_one(script: str, settings: Settings, sleep=time.sleep) -> bytes:
                 language=settings.language,
                 format="mp3",
             )
-        except Exception as e:
+        except SpeechError as e:
             last_error = e
             if attempt < len(RETRY_DELAYS) and is_transient(e):
                 delay = RETRY_DELAYS[attempt]

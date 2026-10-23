@@ -90,3 +90,22 @@ def test_vtt_can_be_read_back_and_written_as_srt():
     vtt = "WEBVTT\n\n1\n00:00:00.000 --> 00:00:01.500\nHello.\n"
     assert vtt_to_segments(vtt) == [{"start": 0.0, "end": 1.5, "text": "Hello."}]
     assert "00:00:00,000 --> 00:00:01,500" in vtt_to_srt(vtt)
+
+
+def test_srt_keeps_the_two_lines_of_a_cue():
+    """A cue wrapped to the broadcast width must not come back as one line."""
+    vtt = (
+        "WEBVTT\n\n1\n00:00:00.000 --> 00:00:03.000\n"
+        "We will go through four slides, each with\nits own narration.\n"
+    )
+    srt = vtt_to_srt(vtt)
+    assert "each with\nits own narration." in srt
+    for line in srt.splitlines():
+        if "-->" in line or line.strip().isdigit() or not line:
+            continue
+        assert len(line) <= 42, line
+
+
+def test_reading_a_cue_as_plain_text_joins_the_lines():
+    vtt = "WEBVTT\n\n1\n00:00:00.000 --> 00:00:03.000\nFirst line\nsecond line\n"
+    assert vtt_to_segments(vtt)[0]["text"] == "First line second line"

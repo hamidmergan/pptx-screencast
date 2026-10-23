@@ -59,8 +59,24 @@ def _parse_vtt_time(s: str) -> float:
     return float(s)
 
 
+def vtt_to_cues(raw: str) -> list[dict]:
+    """Read a WebVTT string back, keeping the line breaks inside a cue.
+
+    A cue of two lines has to stay two lines, otherwise a track that was
+    wrapped to the broadcast width would come back out as one long line.
+    """
+    return _parse_vtt(raw, joiner="\n")
+
+
 def vtt_to_segments(raw: str) -> list[dict]:
-    """Read a WebVTT string back into ``{start, end, text}`` segments."""
+    """Read a WebVTT string back into ``{start, end, text}`` segments.
+
+    The lines of a cue are joined with a space, so the result is plain text.
+    """
+    return _parse_vtt(raw, joiner=" ")
+
+
+def _parse_vtt(raw: str, joiner: str) -> list[dict]:
     segments: list[dict] = []
     lines = raw.replace("\r", "").split("\n")
     i = 0
@@ -81,14 +97,14 @@ def vtt_to_segments(raw: str) -> list[dict]:
             text_lines.append(lines[i])
             i += 1
         if text_lines:
-            segments.append({"start": start, "end": end, "text": " ".join(text_lines).strip()})
+            segments.append({"start": start, "end": end, "text": joiner.join(text_lines).strip()})
         i += 1
     return segments
 
 
 def vtt_to_srt(raw: str) -> str:
     """The same cues as SRT, for players that cannot read VTT."""
-    return segments_to_srt(vtt_to_segments(raw))
+    return segments_to_srt(vtt_to_cues(raw))
 
 
 def _lines(text: str, max_line: int) -> list[str]:

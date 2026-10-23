@@ -39,10 +39,10 @@ language before it is spoken.
 - [x] 3 Audio, subtitles, video: speech per slide, slide duration from the audio, subtitles (VTT, SRT, timing), ffmpeg concat and burn in, outro.
 - [x] 4 API and CLI: `make_video`, `write_script`, CLI with `--voice`, `--script-only`, `--from-script`, `--notes`, `--translate`, `--subtitles`, `--burn-in`, `--slides`.
 - [x] 5 Tests with a fake server for chat, speech and recognition.
-- [ ] 6 README, CHANGELOG 0.1.0, local smoke test with a real model.
+- [x] 6 README, CHANGELOG 0.1.0, local smoke test with a real model.
 - [ ] 7 English sweep, acceptance checks, final commit.
 - [ ] 8 Web UI and Docker.
 
 ## Open
 
-- Steps 6 to 8 are open.
+- Steps 7 and 8 are open.
