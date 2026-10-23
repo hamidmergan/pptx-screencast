@@ -37,7 +37,7 @@ language before it is spoken.
 - [x] 1 Material: slide text and notes, rendering slides to PNG, slide selection, naming, paths, `config.py`, `errors.py`.
 - [x] 2 Script: narration per slide through the model (the count must match), script file (Markdown, one heading per slide), notes as script, translation.
 - [x] 3 Audio, subtitles, video: speech per slide, slide duration from the audio, subtitles (VTT, SRT, timing), ffmpeg concat and burn in, outro.
-- [ ] 4 API and CLI: `make_video`, `write_script`, CLI with `--voice`, `--script-only`, `--from-script`, `--notes`, `--translate`, `--subtitles`, `--burn-in`, `--slides`.
+- [x] 4 API and CLI: `make_video`, `write_script`, CLI with `--voice`, `--script-only`, `--from-script`, `--notes`, `--translate`, `--subtitles`, `--burn-in`, `--slides`.
 - [ ] 5 Tests with a fake server for chat, speech and recognition.
 - [ ] 6 README, CHANGELOG 0.1.0, local smoke test with a real model.
 - [ ] 7 English sweep, acceptance checks, final commit.
@@ -45,4 +45,4 @@ language before it is spoken.
 
 ## Open
 
-- Steps 4 to 8 are open.
+- Steps 5 to 8 are open.
