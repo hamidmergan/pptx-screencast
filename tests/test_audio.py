@@ -81,6 +81,20 @@ def test_a_server_that_stays_down_ends_in_an_error(tmp_path, server, monkeypatch
         module.speak_all(["One sentence."], tmp_path, _settings(server), max_workers=1)
 
 
+def test_a_dead_server_is_asked_exactly_once_per_attempt(tmp_path, server, monkeypatch):
+    """The retries of this package must not multiply with the ones of the voice."""
+    monkeypatch.setattr(module, "RETRY_DELAYS", (0.0, 0.0, 0.0))
+    server.fail_times = 99
+    server.status = 503
+    with pytest.raises(ModelError):
+        module.speak_all(["One sentence."], tmp_path, _settings(server), max_workers=1)
+    assert server.count("speech") == len(module.RETRY_DELAYS) + 1 == 4
+
+
+def test_the_voice_makes_no_attempt_of_its_own():
+    assert module.TTS_MAX_RETRIES == 0
+
+
 def test_a_refused_request_is_not_retried(tmp_path, server, monkeypatch):
     waits = []
     monkeypatch.setattr(module, "RETRY_DELAYS", (0.0, 0.0))
@@ -92,7 +106,15 @@ def test_a_refused_request_is_not_retried(tmp_path, server, monkeypatch):
     assert waits == []
 
 
-def test_a_transient_error_is_told_apart_from_a_refusal():
-    assert module.is_transient(RuntimeError("Request failed (503)"))
-    assert module.is_transient(RuntimeError("Request failed (429)"))
-    assert not module.is_transient(RuntimeError("Request failed (401)"))
+@pytest.mark.parametrize("message, transient", [
+    ("Request failed (503)", True),
+    ("Request failed (429)", True),
+    ("Request to http://x/v1 failed: Error code: 503 - {'message': 'busy'}", True),
+    ("Error code: 500", True),
+    ("Request failed (401)", False),
+    ("Request to http://x/v1 failed: Error code: 401 - invalid key", False),
+    ("Request failed, nothing came back", False),
+])
+def test_a_transient_error_is_told_apart_from_a_refusal(message, transient):
+    """Both wordings count, the voice and the source client phrase it differently."""
+    assert module.is_transient(RuntimeError(message)) is transient

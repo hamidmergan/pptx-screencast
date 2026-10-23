@@ -45,7 +45,8 @@ language before it is spoken.
 
 ## Deliberate deviations from the source
 
-Copying the source protects behaviour worth keeping, not defects.
+Copying the source protects behaviour worth keeping, not defects. Three places
+were changed on purpose.
 
 - **The retry flag of a gap no longer gets overwritten.** When a batch comes
   back with a slide that has text but no script, that slide is generated on its
@@ -55,6 +56,19 @@ Copying the source protects behaviour worth keeping, not defects.
   being asked. The result now has its own name. Covered by
   `test_a_failed_retry_does_not_silence_the_slides_after_it`, which fails
   against the old code.
+- **The speech is asked at most four times per slide.** doc2speech makes
+  attempts of its own inside every attempt made here, so a server that is down
+  for good was asked nine times for one slide, without the growing waits in
+  between. `TTS_MAX_RETRIES` is 0, so one attempt here is one request, and the
+  policy of a slide lives in `RETRY_DELAYS` alone: four attempts, waiting 2, 5
+  and 10 seconds. Covered by
+  `test_a_dead_server_is_asked_exactly_once_per_attempt`.
+- **A busy speech server is recognised by its status, not by one spelling.**
+  The source matched the literal `(503)` its own client produced. doc2speech
+  writes `Error code: 503`, so no retry here ever fired and only the attempts
+  inside doc2speech were doing the work. Both spellings are matched now, and a
+  status that will not change, such as 401, is still not transient.
+
 ## Open
 
 - `doc2speech` is declared as a normal version dependency. Until it is on a

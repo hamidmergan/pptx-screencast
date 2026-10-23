@@ -12,6 +12,7 @@ later with ffmpeg.
 """
 
 import logging
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -26,17 +27,34 @@ logger = logging.getLogger(__name__)
 # Waits before the second, third and fourth attempt of one slide.
 RETRY_DELAYS = (2.0, 5.0, 10.0)
 
-# Markers of a server that was only busy for a moment.
-_TRANSIENT = ("(500)", "(502)", "(503)", "(504)", "(429)")
+# Attempts doc2speech makes of its own inside one of ours. Zero, because the
+# retry policy of a slide belongs here. Left at its default of two, a server
+# that is down for good would be asked nine times for one slide instead of
+# four, with none of the growing waits above between them.
+TTS_MAX_RETRIES = 0
+
+# Statuses of a server that was only busy for a moment.
+_TRANSIENT_CODES = frozenset({"429", "500", "502", "503", "504"})
+
+# The status in an error text, written either as "(503)" or as "code: 503".
+_STATUS = re.compile(r"\((\d{3})\)|code:?\s*(\d{3})", re.IGNORECASE)
 
 # Called with the number of finished slides, the total and the slide number.
 Progress = Callable[[int, int, int], None]
 
 
 def is_transient(error: Exception) -> bool:
-    """True when another attempt can help."""
+    """True when another attempt can help.
+
+    Servers and clients word their errors differently, so the bare "(503)" of
+    one and the "Error code: 503" of the next both have to be recognised. A
+    status that will not change, such as 401, is not transient.
+    """
     text = str(error)
-    return any(code in text for code in _TRANSIENT)
+    for found in _STATUS.finditer(text):
+        if (found.group(1) or found.group(2)) in _TRANSIENT_CODES:
+            return True
+    return False
 
 
 def audio_path(tmp: Path, index: int) -> Path:
@@ -63,6 +81,7 @@ def speak_one(script: str, settings: Settings, sleep=time.sleep) -> bytes:
                 api_key=settings.tts_api_key,
                 language=settings.language,
                 format="mp3",
+                max_retries=TTS_MAX_RETRIES,
             )
         except SpeechError as e:
             last_error = e
