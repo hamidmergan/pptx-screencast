@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import List, Optional, Sequence, Union
 
 from .errors import ScriptError
+from .material import prepare_materials
+from .review import find_unchanged_slides
 from .script_file import read_script_file
 
 logger = logging.getLogger(__name__)
@@ -34,13 +36,17 @@ def generate_all_scripts(
     target_lang: str = "EN-US",
     materials: Optional[List[str]] = None,
 ) -> List[str]:
-    """One narration per slide from the chat model."""
+    """One narration per slide from the chat model.
+
+    `materials` is extra text per slide. It is cleaned of the batch
+    separators and trimmed per slide before it reaches the prompt.
+    """
     try:
         scripts = llm_client.generate_scripts_batch(
             slide_texts, glossary, add_greeting, add_closing,
             min_chars=min_chars, max_chars=max_chars,
             source_lang=source_lang, target_lang=target_lang,
-            materials=materials,
+            materials=prepare_materials(materials, len(slide_texts)),
         )
         logger.info("Batch script generation completed for %s slides", len(slide_texts))
         return scripts
@@ -83,9 +89,17 @@ def translate_scripts(
     """
     if not (target_lang or "").strip():
         return list(scripts)
-    return llm_client.translate_batch(
+    translated = llm_client.translate_batch(
         list(scripts), target_lang, max_workers=max_workers, glossary=glossary
     )
+    unchanged = find_unchanged_slides(scripts, translated)
+    if unchanged:
+        logger.warning(
+            "The translation left slide(s) %s exactly as they were. Read them "
+            "before the video is built.",
+            ", ".join(str(index + 1) for index in unchanged),
+        )
+    return translated
 
 
 def check_count(scripts: Sequence[str], count: int) -> List[str]:

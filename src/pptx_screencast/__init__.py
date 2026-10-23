@@ -1,5 +1,7 @@
 from .core import build_scripts, make_video, write_script
 from .glossary import parse_glossary, read_glossary
+from .material import clean_material, prepare_materials
+from .review import find_unchanged_slides
 from .errors import (
     ConfigError,
     ModelError,
@@ -29,6 +31,9 @@ __all__ = [
     "parse_slides",
     "parse_glossary",
     "read_glossary",
+    "clean_material",
+    "prepare_materials",
+    "find_unchanged_slides",
     "missing_tools",
     "require_tools",
     "ScreencastError",

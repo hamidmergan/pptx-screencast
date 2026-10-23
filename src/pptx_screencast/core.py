@@ -96,13 +96,15 @@ def build_scripts(
     notes: bool = False,
     translate: str = "",
     glossary: Optional[dict] = None,
+    materials: Optional[Sequence[str]] = None,
     client=None,
     progress: Optional[Progress] = None,
 ) -> List[str]:
     """One narration per visible slide, from a file, the notes or the model.
 
     `glossary` is a mapping of term to replacement. It holds for the
-    narration the model writes and for the translation.
+    narration the model writes and for the translation. `materials` is extra
+    text per slide, which the model may use to make the narration concrete.
     """
     slide_texts = _deck_texts(pptx)
     _check_size(len(slide_texts), settings)
@@ -116,7 +118,7 @@ def build_scripts(
         _report(progress, "scripts", 0, total)
         llm = make_llm(settings, client)
         scripts = generate_all_scripts(
-            slide_texts, llm, glossary=glossary,
+            slide_texts, llm, glossary=glossary, materials=materials,
             min_chars=settings.min_chars, max_chars=settings.max_chars,
             target_lang=settings.language,
         )
@@ -138,6 +140,7 @@ def write_script(
     notes: bool = False,
     translate: str = "",
     glossary: Optional[dict] = None,
+    materials: Optional[Sequence[str]] = None,
     client=None,
     progress: Optional[Progress] = None,
     **settings,
@@ -150,7 +153,7 @@ def write_script(
     resolved = config.resolve(require_voice=False, **settings)
     scripts = build_scripts(
         deck, resolved, notes=notes, translate=translate, glossary=glossary,
-        client=client, progress=progress,
+        materials=materials, client=client, progress=progress,
     )
     target = Path(output) if output is not None else free_path(deck.with_suffix(".md"))
     return write_script_file(scripts, target, title=deck.stem)
@@ -198,6 +201,7 @@ def make_video(
     notes: bool = False,
     translate: str = "",
     glossary: Optional[dict] = None,
+    materials: Optional[Sequence[str]] = None,
     slides: Optional[List[int]] = None,
     keep_work_dir: bool = False,
     client=None,
@@ -217,7 +221,7 @@ def make_video(
 
     scripts = build_scripts(
         deck, resolved, script=script, notes=notes, translate=translate,
-        glossary=glossary, client=client, progress=progress,
+        glossary=glossary, materials=materials, client=client, progress=progress,
     )
     selection = slide_selection(len(scripts), slides, None)
     if not selection.clip_slides:

@@ -148,6 +148,22 @@ path = write_script(
 )
 ```
 
+Extra text per slide, so the narration can be concrete about what is only hinted at on the slide:
+
+```python
+from pptx_screencast import write_script
+
+path = write_script(
+    "deck.pptx",
+    "deck.md",
+    materials=["The definition and the example behind slide one.", ""],
+    base_url="http://localhost:11434/v1",
+    model="your-chat-model",
+)
+```
+
+One entry per slide, empty where a slide has none. The text has to be plain text, this package reads PPTX files and nothing else. It is trimmed per slide and cleaned of the characters the batch format uses, so it can never shift the narration to another slide.
+
 `make_video` takes the same keywords as the command line, written with underscores (`from_script` is `script`, `--burn-in` is `burn_in`). `slides` counts from zero there, because it is a list of indexes. A `progress` callback is called with the name of the step, the finished units and the total.
 
 ### Web UI
