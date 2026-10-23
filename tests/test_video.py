@@ -2,6 +2,7 @@
 
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -134,3 +135,24 @@ def test_an_ffmpeg_without_the_filter_keeps_the_separate_track(tmp_path, slide_i
     track = tmp_path / "subtitles.srt"
     track.write_text("1\n00:00:00,000 --> 00:00:02,000\nHello\n", encoding="utf-8")
     assert module.burn_in_subtitles(clip, track, tmp_path / "burned.mp4") == clip
+
+
+def test_a_clip_with_a_pause_is_built_from_a_relative_path(tmp_path, slide_image, speech, monkeypatch):
+    """The concat demuxer reads entries relative to the list file, not to the cwd."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "work").mkdir()
+    module.create_slide_video(
+        Path("slide.png"), Path("speech.mp3"), Path("work/clip.mp4"), pause=1.0
+    )
+    assert module.get_video_duration(tmp_path / "work/clip.mp4") == pytest.approx(3.0, abs=0.4)
+
+
+def test_relative_clips_are_joined(tmp_path, slide_image, speech, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "work").mkdir()
+    module.create_slide_video(Path("slide.png"), Path("speech.mp3"), Path("work/a.mp4"))
+    module.create_slide_video(Path("slide.png"), None, Path("work/b.mp4"), silent_duration=2.0)
+    module.concatenate_videos(
+        [Path("work/a.mp4"), Path("work/b.mp4")], Path("work/joined.mp4")
+    )
+    assert module.get_video_duration(tmp_path / "work/joined.mp4") == pytest.approx(4.0, abs=0.6)

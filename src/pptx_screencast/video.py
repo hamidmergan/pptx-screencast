@@ -137,8 +137,9 @@ def create_slide_video(
         audio_with_pause_path = output_path.with_suffix(".paused.mp3")
         concat_audio_file = output_path.with_suffix(".audiolist.txt")
         with open(concat_audio_file, "w") as handle:
-            handle.write(f"file '{audio_path}'\n")
-            handle.write(f"file '{silence_path}'\n")
+            # Absolute, because ffmpeg resolves an entry against the list file.
+            handle.write(f"file '{Path(audio_path).resolve()}'\n")
+            handle.write(f"file '{Path(silence_path).resolve()}'\n")
         cmd_concat = [
             "ffmpeg", "-y", "-f", "concat", "-safe", "0",
             "-i", str(concat_audio_file),
@@ -174,7 +175,8 @@ def concatenate_videos(video_paths: List[Path], output_path: Path) -> None:
     concat_file = output_path.parent / "concat_list.txt"
     with open(concat_file, "w") as handle:
         for path in video_paths:
-            handle.write(f"file '{path}'\n")
+            # Absolute, because ffmpeg resolves an entry against the list file.
+            handle.write(f"file '{Path(path).resolve()}'\n")
 
     cmd = [
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",

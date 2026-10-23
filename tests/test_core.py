@@ -156,6 +156,15 @@ def test_the_work_directory_is_kept_when_asked(deck, server, tmp_path, no_libreo
     assert any(work.rglob("slide_000.mp3"))
 
 
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_a_relative_work_directory_works(deck, server, tmp_path, no_libreoffice, monkeypatch):
+    """The default pause puts every clip through the audio concat list."""
+    monkeypatch.chdir(tmp_path)
+    out = core.make_video(deck, tmp_path / "deck.mp4", work_dir="work", **_options(server))
+    assert get_video_duration(out) > 0
+    assert (tmp_path / "work" / "audio" / "slide_000.mp3").exists()
+
+
 # -- What is refused --
 
 def test_a_script_file_with_the_wrong_count_is_refused(deck, server, tmp_path, no_libreoffice):

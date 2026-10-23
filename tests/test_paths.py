@@ -77,3 +77,16 @@ def test_a_failed_translation_keeps_the_original_stem():
 def test_without_a_translator_the_stem_stays():
     assert translate_stem("my_deck.pptx", "de") == "my_deck"
     assert translate_stem("my_deck.pptx", "") == "my_deck"
+
+
+def test_a_relative_work_directory_becomes_absolute(tmp_path, monkeypatch):
+    """ffmpeg reads concat entries relative to the list file, so paths must be absolute."""
+    monkeypatch.chdir(tmp_path)
+    with work_dir("work") as folder:
+        assert folder.is_absolute()
+        assert folder == (tmp_path / "work").resolve()
+
+
+def test_a_relative_temporary_work_directory_is_absolute_too():
+    with work_dir() as folder:
+        assert folder.is_absolute()

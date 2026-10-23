@@ -40,13 +40,17 @@ def work_dir(configured: Optional[str] = None, keep: bool = False) -> Iterator[P
 
     A configured folder is created and kept. Without one a temporary folder is
     used and removed again, unless `keep` says otherwise.
+
+    The path is always absolute. ffmpeg reads the entries of a concat list
+    relative to the directory of the list file, so a relative intermediate
+    path would be looked for one folder too deep.
     """
     if configured:
-        target = Path(configured).expanduser()
+        target = Path(configured).expanduser().resolve()
         target.mkdir(parents=True, exist_ok=True)
         yield target
         return
-    created = Path(tempfile.mkdtemp(prefix="pptx-screencast-"))
+    created = Path(tempfile.mkdtemp(prefix="pptx-screencast-")).resolve()
     try:
         yield created
     finally:
