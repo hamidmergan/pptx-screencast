@@ -225,11 +225,14 @@ Faithful to the source, no user visible harm, worth knowing.
   "send no speed at all" cannot be expressed through its public call, because
   passing `None` means "take the environment". A set variable is pointed out
   with a warning naming `--speed` instead.
-- **Carried helpers without a call site in the pipeline.** `selection.audio_slots`,
-  `selection.slides_to_speak` and `Selection.old_audio_allowed` belong to the
-  re-voice flow that is not carried, `naming.build_artifact_stem`,
-  `script_file.numbered_headings` and `subtitles.build_subtitle_srt` are part of
-  the library surface and are exported and tested.
+- **Carried helpers without a call site in the pipeline.**
+  `selection.audio_slots`, `selection.slides_to_speak` and
+  `Selection.old_audio_allowed` belong to the re-voice flow that is not
+  carried, and they are kept because the selection is copied as a whole.
+  `naming.build_artifact_stem`, `script_file.numbered_headings`,
+  `subtitles.build_subtitle_srt`, `subtitles.build_subtitle_vtt`,
+  `subtitle_converter.vtt_to_cues` and `vtt_to_srt` are exported from the
+  package root, so they are library surface and not dead weight.
 - **The subtitles stay next to the video even when they are burned in.** The
   `.vtt` and `.srt` files are written in both cases, because they are useful
   on their own.

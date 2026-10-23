@@ -250,3 +250,15 @@ def test_one_worker_against_a_dead_deck_pays_exactly_one_ladder(
     with pytest.raises(ModelError):
         module.speak_all([LONG_SCRIPT] * 40, tmp_path, _settings(server), max_workers=1)
     assert server.count("speech") == 4
+
+
+def test_the_slides_are_released_in_order_even_with_several_workers(tmp_path, server):
+    """A progress display has to fill front to back, whatever finishes first."""
+    seen = []
+    module.speak_all(
+        [LONG_SCRIPT, "Short.", LONG_SCRIPT, "Also short."],
+        tmp_path, _settings(server),
+        on_slide_done=lambda done, total, index: seen.append(index),
+        max_workers=4,
+    )
+    assert seen == [0, 1, 2, 3]
