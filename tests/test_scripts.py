@@ -152,6 +152,23 @@ def test_placeholder_never_reaches_the_video_even_if_retry_fails():
     assert result[1] == ""
 
 
+def test_a_failed_retry_does_not_silence_the_slides_after_it():
+    """Slide 1 comes back empty even on its own. Slide 3 still gets its turn."""
+    client = ScriptClient([
+        f"(empty)\n|||\n{LONG}\n|||\n(empty)",  # first and last slide blank
+        RuntimeError("provider gone"),         # slide 1 on its own, nothing comes back
+        "The third slide explains the result.",  # slide 3 on its own
+    ])
+    result = client.generate_scripts_batch(
+        ["Slide text one", "Slide text two", "Slide text three"],
+        add_greeting=False, add_closing=False,
+    )
+    assert result[0] == ""
+    assert result[1] == LONG
+    assert result[2].startswith("The third slide")
+    assert len(client.calls) == 3, "one batch, then both gaps on their own"
+
+
 def test_truly_empty_slide_costs_no_extra_call():
     """A slide without text may stay empty, without asking the model."""
     client = ScriptClient([f"{LONG}\n|||\n\n|||\n{LONG}"])

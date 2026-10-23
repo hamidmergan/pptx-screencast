@@ -304,12 +304,13 @@ class _ScriptsMixin:
                     "Slide %s has no usable script (%r), generating it on its own",
                     slide_no, script[:40],
                 )
-                retry = _one_slide(text, idx, slide_no)
-                if is_blank_script(retry):
+                # Its own name, the flag has to survive for the slides after it.
+                again = _one_slide(text, idx, slide_no)
+                if is_blank_script(again):
                     logger.warning("Slide %s has no script even on its own, it stays silent", slide_no)
                     scripts[i] = ""
                 else:
-                    scripts[i] = retry
+                    scripts[i] = again
             return scripts
 
         def _run_batch_with_retry(texts: list[str], idx: int, n: int) -> tuple[int, list[str]]:

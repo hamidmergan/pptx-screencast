@@ -43,6 +43,18 @@ language before it is spoken.
 - [x] 7 English sweep, acceptance checks, final commit.
 - [x] 8 Web UI and Docker.
 
+## Deliberate deviations from the source
+
+Copying the source protects behaviour worth keeping, not defects.
+
+- **The retry flag of a gap no longer gets overwritten.** When a batch comes
+  back with a slide that has text but no script, that slide is generated on its
+  own. The flag that says whether a gap may still be retried shared its name
+  with the result of that single call, so a retry that came back empty turned
+  the flag falsy and every later gap of the same batch was silenced without
+  being asked. The result now has its own name. Covered by
+  `test_a_failed_retry_does_not_silence_the_slides_after_it`, which fails
+  against the old code.
 ## Open
 
 - `doc2speech` is declared as a normal version dependency. Until it is on a
