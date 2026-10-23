@@ -4,7 +4,8 @@ import logging
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List, Optional, Sequence
+from threading import Lock
+from typing import Callable, List, Optional, Sequence
 
 from .subtitle_converter import segments_to_srt, segments_to_vtt, split_long_segments
 
@@ -25,10 +26,37 @@ def vtt_language_code(target_lang: str) -> str:
     return _LANGUAGE_CODES.get((target_lang or "").split("-")[0].upper(), "")
 
 
-def transcribe_slides(audio_paths: Sequence[Optional[Path]], client) -> List[List[dict]]:
-    """The timestamped segments per slide, an error yields an empty list."""
+def transcribe_slides(
+    audio_paths: Sequence[Optional[Path]],
+    client,
+    on_done: Optional[Callable[[int, int], None]] = None,
+) -> List[List[dict]]:
+    """The timestamped segments per slide, an error yields an empty list.
+
+    `on_done` is called with the finished and the total number of clips, so a
+    long step shows that it is moving. A recogniser that reports it is out of
+    time is not asked again, the remaining clips simply get no cues.
+    """
+    total = len(audio_paths)
+    done = [0]
+    lock = Lock()
+
+    def _finished() -> None:
+        if on_done is None:
+            return
+        with lock:
+            done[0] += 1
+            on_done(done[0], total)
+
     def _one(path: Optional[Path]) -> List[dict]:
         if path is None or not path.exists() or path.stat().st_size == 0:
+            _finished()
+            return []
+        if getattr(client, "out_of_time", lambda: False)():
+            logger.warning(
+                "The time for the subtitles is up, %s gets no cues", path.name
+            )
+            _finished()
             return []
         try:
             segments, _ = client.transcribe_verbose(str(path))
@@ -36,6 +64,8 @@ def transcribe_slides(audio_paths: Sequence[Optional[Path]], client) -> List[Lis
         except Exception as e:
             logger.warning("No subtitles recognised for %s: %s", path.name, e)
             return []
+        finally:
+            _finished()
 
     with ThreadPoolExecutor(max_workers=_PARALLEL) as pool:
         return list(pool.map(_one, audio_paths))
@@ -95,6 +125,7 @@ def create_subtitle_track(
     tmp: Path,
     client,
     has_speech: Optional[Sequence[bool]] = None,
+    on_done: Optional[Callable[[int, int], None]] = None,
 ) -> Optional[Path]:
     """Recognise subtitles per clip and store them as VTT, silent slides stay out."""
     from .video import get_video_duration
@@ -106,7 +137,7 @@ def create_subtitle_track(
             else None
             for i, clip in enumerate(clip_paths)
         ]
-        slide_segments = transcribe_slides(audios, client)
+        slide_segments = transcribe_slides(audios, client, on_done)
         durations = [get_video_duration(p) for p in clip_paths]
         track_text = build_subtitle_vtt(slide_segments, durations)
     except Exception as e:

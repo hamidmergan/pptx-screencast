@@ -389,3 +389,32 @@ def test_the_speak_step_counts_only_the_chosen_slides(deck, server, tmp_path, no
     speak = [row for row in seen if row[0] == "speak"]
     assert [row[2] for row in speak] == [2] * len(speak)
     assert [row[1] for row in speak] == [0, 1, 2]
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_the_subtitle_step_reports_every_clip(deck, server, tmp_path, no_libreoffice):
+    """A step that can wait for minutes has to show that it is moving."""
+    seen = []
+    core.make_video(
+        deck, tmp_path / "deck.mp4",
+        progress=lambda step, done, total: seen.append((step, done, total)),
+        **_options(server, subtitles=True, stt_model="whisper"),
+    )
+    rows = [row for row in seen if row[0] == "subtitles"]
+    # Four slides plus the notice clip at each end.
+    assert rows[0] == ("subtitles", 0, 6)
+    assert sorted(row[1] for row in rows) == [0, 1, 2, 3, 4, 5, 6, 6]
+
+
+def test_the_subtitle_step_has_a_time_limit():
+    from pptx_screencast import config
+
+    assert config.STT_TIMEOUT > 0
+    settings = config.resolve(
+        base_url="http://127.0.0.1:1/v1", model="chat", require_voice=False
+    )
+    assert settings.stt_timeout == config.STT_TIMEOUT
+    settings = config.resolve(
+        base_url="http://127.0.0.1:1/v1", model="chat", stt_timeout=60.0, require_voice=False
+    )
+    assert settings.stt_timeout == 60.0

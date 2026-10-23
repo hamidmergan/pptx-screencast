@@ -10,6 +10,8 @@ import logging
 import time
 from typing import Optional
 
+from .errors import ModelError
+
 logger = logging.getLogger(__name__)
 
 # Statuses worth another attempt that are not a 5xx.
@@ -60,14 +62,30 @@ def is_transient_error(e: Exception) -> bool:
 
 
 class Recogniser:
-    """The speech recognition route, with a wait between the attempts."""
+    """The speech recognition route, with a wait between the attempts.
+
+    `deadline` is a `time.monotonic()` stamp for the whole subtitle step. A
+    wait that would run past it is not taken, so a server that is up and
+    rate limiting cannot hold a run for hours. Without a deadline the full
+    ladder is walked, which is up to 1580 seconds for one file.
+    """
 
     # Eight attempts in all, the tail covers a stubborn rate limit.
     BACKOFFS = (5, 15, 60, 180, 300, 420, 600)
 
-    def __init__(self, client, model: str):
+    def __init__(self, client, model: str, deadline: Optional[float] = None):
         self._client = client
         self._model = model
+        self._deadline = deadline
+
+    def out_of_time(self) -> bool:
+        """True when the step has used up the time it was given."""
+        return self._deadline is not None and time.monotonic() >= self._deadline
+
+    def _may_wait(self, seconds: float) -> bool:
+        if self._deadline is None:
+            return True
+        return time.monotonic() + seconds < self._deadline
 
     def _verbose_call(self, file_path: str) -> tuple[list[dict], str]:
         """Ask the model and return the segments with the language it heard."""
@@ -98,6 +116,13 @@ class Recogniser:
                 last_err = e
                 if attempt < len(self.BACKOFFS) and is_transient_error(e):
                     wait = self.BACKOFFS[attempt]
+                    if not self._may_wait(wait):
+                        logger.warning(
+                            "Speech recognition failed (attempt %s/%s): %s, and the "
+                            "time for the subtitles is up, so it is not asked again",
+                            attempt + 1, len(self.BACKOFFS) + 1, e,
+                        )
+                        break
                     logger.warning(
                         "Speech recognition failed (attempt %s/%s): %s, trying again in %ss",
                         attempt + 1, len(self.BACKOFFS) + 1, e, wait,
@@ -105,7 +130,7 @@ class Recogniser:
                     time.sleep(wait)
                     continue
                 break
-        raise RuntimeError(f"Speech recognition failed: {last_err}") from last_err
+        raise ModelError(f"Speech recognition failed: {last_err}") from last_err
 
     def transcribe_verbose(self, file_path: str) -> tuple[list[dict], str]:
         """The segments of a file and the language they are in."""

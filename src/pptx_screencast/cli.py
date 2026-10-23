@@ -34,6 +34,10 @@ def _model_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--stt-base-url", help="Server of the speech recognition model (default: --base-url)")
     p.add_argument("--stt-model", help="Name of the speech recognition model, needed for subtitles")
     p.add_argument("--stt-api-key", help="API key of the recognition server (default: --api-key)")
+    p.add_argument(
+        "--stt-timeout", type=float,
+        help="Seconds the whole subtitle step may take (default 900)",
+    )
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -142,6 +146,7 @@ def _model_options(args) -> dict:
         "stt_base_url": args.stt_base_url,
         "stt_model": args.stt_model,
         "stt_api_key": args.stt_api_key,
+        "stt_timeout": args.stt_timeout,
         "voice": args.voice,
         "speed": args.speed,
         "language": args.language,

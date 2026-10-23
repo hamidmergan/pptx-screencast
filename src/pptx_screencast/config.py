@@ -60,6 +60,11 @@ CRF = 23
 # Slides rendered, voiced or cut at the same time.
 MAX_WORKERS = 4
 
+# Seconds the whole subtitle step may take. The recogniser waits between its
+# attempts, and a server that is up and rate limiting would otherwise hold a
+# run for hours. When the time is up the remaining clips get no cues.
+STT_TIMEOUT = 900.0
+
 LANGUAGE = "en"
 
 
@@ -74,6 +79,7 @@ class Settings:
     stt_base_url: str
     stt_model: str
     stt_api_key: str
+    stt_timeout: float
     voice: str
     speed: float
     language: str
@@ -134,6 +140,7 @@ def resolve(
     stt_base_url: Optional[str] = None,
     stt_model: Optional[str] = None,
     stt_api_key: Optional[str] = None,
+    stt_timeout: Optional[float] = None,
     voice: Optional[str] = None,
     speed: Optional[float] = None,
     language: Optional[str] = None,
@@ -201,6 +208,7 @@ def resolve(
         stt_base_url=stt_base_url,
         stt_model=stt_model,
         stt_api_key=stt_key,
+        stt_timeout=_pick(stt_timeout, "STT_TIMEOUT", STT_TIMEOUT, float),
         voice=str(voice or "").strip(),
         speed=_pick(speed, "SPEED", SPEED, float),
         language=str(_pick(language, "LANGUAGE", LANGUAGE, str)).strip() or LANGUAGE,
@@ -235,6 +243,7 @@ def _validate(s: Settings) -> None:
         "batch_timeout": s.batch_timeout,
         "max_slides": s.max_slides,
         "max_workers": s.max_workers,
+        "stt_timeout": s.stt_timeout,
     }
     for name, value in positive.items():
         if value <= 0:

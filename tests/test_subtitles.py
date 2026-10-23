@@ -265,3 +265,60 @@ def test_a_broken_recogniser_leaves_no_track(tmp_path):
             raise RuntimeError("no recognition model configured")
 
     assert module.create_subtitle_track([tmp_path / "a.mp4"], tmp_path, _Broken()) is None
+
+
+# -- The step says how far it got, and gives up when its time is used up --
+
+def test_the_progress_counts_every_clip(tmp_path):
+    files = []
+    for i in range(3):
+        path = tmp_path / f"stt_{i:03d}.m4a"
+        path.write_bytes(b"audio")
+        files.append(path)
+    recogniser = _FakeRecogniser({p.name: [_seg(0.0, 0.5, "Hi")] for p in files})
+
+    seen = []
+    transcribe_slides(files, recogniser, lambda done, total: seen.append((done, total)))
+    assert sorted(seen) == [(1, 3), (2, 3), (3, 3)]
+
+
+def test_a_silent_clip_is_counted_too(tmp_path):
+    path = tmp_path / "stt_000.m4a"
+    path.write_bytes(b"audio")
+    recogniser = _FakeRecogniser({path.name: [_seg(0.0, 0.5, "Hi")]})
+    seen = []
+    transcribe_slides([path, None], recogniser, lambda done, total: seen.append(done))
+    assert sorted(seen) == [1, 2]
+
+
+def test_a_failed_clip_is_counted_too(tmp_path):
+    path = tmp_path / "stt_000.m4a"
+    path.write_bytes(b"audio")
+    recogniser = _FakeRecogniser({path.name: RuntimeError("gone")})
+    seen = []
+    result = transcribe_slides([path], recogniser, lambda done, total: seen.append(done))
+    assert result == [[]]
+    assert seen == [1]
+
+
+def test_a_recogniser_out_of_time_is_not_asked_again(tmp_path):
+    """Forty clips at up to 26 minutes each used to hold a run for hours."""
+    class _OutOfTime(_FakeRecogniser):
+        def out_of_time(self):
+            return True
+
+    paths = []
+    for i in range(3):
+        path = tmp_path / f"stt_{i:03d}.m4a"
+        path.write_bytes(b"audio")
+        paths.append(path)
+    recogniser = _OutOfTime({})
+    assert transcribe_slides(paths, recogniser) == [[], [], []]
+    assert recogniser.calls == []
+
+
+def test_without_a_progress_callback_nothing_breaks(tmp_path):
+    path = tmp_path / "stt_000.m4a"
+    path.write_bytes(b"audio")
+    recogniser = _FakeRecogniser({path.name: [_seg(0.0, 0.5, "Hi")]})
+    assert transcribe_slides([path], recogniser)[0][0]["text"] == "Hi"

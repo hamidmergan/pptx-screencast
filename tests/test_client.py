@@ -43,3 +43,31 @@ def test_the_timeout_uses_the_phases_when_a_library_is_there():
     assert timeout != module.READ_TIMEOUT
     assert timeout.read == module.READ_TIMEOUT
     assert timeout.connect == module.CONNECT_TIMEOUT
+
+
+def test_the_clients_make_no_attempt_of_their_own():
+    """The retry policy belongs to this package, with the waits it chose."""
+    assert module.CLIENT_MAX_RETRIES == 0
+    assert module.make_chat_client(_settings()).max_retries == 0
+    settings = _settings(stt_base_url="http://127.0.0.1:2/v1", stt_model="whisper")
+    assert module.make_stt_client(settings).max_retries == 0
+
+
+def test_the_recogniser_is_asked_once_per_attempt(server, tmp_path, monkeypatch):
+    from pptx_screencast import stt
+    from pptx_screencast.errors import ModelError
+
+    monkeypatch.setattr(stt.Recogniser, "BACKOFFS", (0.0, 0.0))
+    audio = tmp_path / "slide.mp3"
+    audio.write_bytes(b"not really audio")
+    settings = resolve(
+        base_url=server.base_url, model="chat", stt_model="whisper", require_voice=False
+    )
+    server.fail_times = 99
+    server.status = 503
+    recogniser = stt.Recogniser(module.make_stt_client(settings), "whisper")
+    try:
+        recogniser.transcribe_verbose(str(audio))
+    except ModelError:
+        pass
+    assert server.count("transcribe") == 3

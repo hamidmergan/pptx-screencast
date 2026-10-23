@@ -7,6 +7,7 @@ from the deck to the finished MP4 and can start from such a script file.
 
 import logging
 import shutil
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Lock
@@ -258,7 +259,10 @@ def make_video(
         track = None
         if resolved.subtitles:
             _report(progress, "subtitles", 0, len(clips))
-            track = _subtitle_track(clips, tmp, resolved, has_speech, stt_client)
+            track = _subtitle_track(
+                clips, tmp, resolved, has_speech, stt_client,
+                on_done=lambda done, total: _report(progress, "subtitles", done, total),
+            )
             _report(progress, "subtitles", len(clips), len(clips))
 
         _report(progress, "join", 0, 1)
@@ -352,8 +356,13 @@ def _subtitle_track(
     settings: config.Settings,
     has_speech: Sequence[bool],
     stt_client,
+    on_done=None,
 ) -> Optional[Path]:
-    """The recognised cues of the whole video, or None without a model."""
+    """The recognised cues of the whole video, or None without a model.
+
+    The whole step is bounded by `stt_timeout`, so a recogniser that keeps
+    asking for patience cannot hold the run for hours.
+    """
     if stt_client is None and not settings.has_stt:
         logger.warning(
             "No speech recognition model is configured, so the video gets no "
@@ -361,8 +370,10 @@ def _subtitle_track(
         )
         return None
     client = stt_client if stt_client is not None else make_stt_client(settings)
-    recogniser = Recogniser(client, settings.stt_model)
-    return create_subtitle_track(clips, tmp, recogniser, has_speech)
+    recogniser = Recogniser(
+        client, settings.stt_model, deadline=time.monotonic() + settings.stt_timeout
+    )
+    return create_subtitle_track(clips, tmp, recogniser, has_speech, on_done=on_done)
 
 
 __all__ = ["build_scripts", "make_video", "write_script"]

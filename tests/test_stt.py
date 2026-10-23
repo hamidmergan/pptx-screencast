@@ -5,6 +5,7 @@ import pytest
 from pptx_screencast import stt as module
 from pptx_screencast.client import make_stt_client
 from pptx_screencast.config import resolve
+from pptx_screencast.errors import ModelError, ScreencastError
 
 
 @pytest.fixture
@@ -42,7 +43,16 @@ def test_a_server_that_stays_down_raises(recogniser, audio, server, monkeypatch)
     monkeypatch.setattr(module.Recogniser, "BACKOFFS", (0.0,))
     server.fail_times = 99
     server.status = 503
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ModelError):
+        recogniser.transcribe_verbose(str(audio))
+
+
+def test_the_failure_stays_inside_the_error_contract(recogniser, audio, server, monkeypatch):
+    """A RuntimeError would walk past every caller that catches ScreencastError."""
+    monkeypatch.setattr(module.Recogniser, "BACKOFFS", ())
+    server.fail_times = 99
+    server.status = 503
+    with pytest.raises(ScreencastError):
         recogniser.transcribe_verbose(str(audio))
 
 
@@ -50,9 +60,54 @@ def test_a_refusal_is_not_retried(recogniser, audio, server, monkeypatch):
     monkeypatch.setattr(module.Recogniser, "BACKOFFS", (0.0, 0.0))
     server.fail_times = 99
     server.status = 401
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ModelError):
         recogniser.transcribe_verbose(str(audio))
     assert server.count("transcribe") == 1
+
+
+# -- The time the whole subtitle step gets --
+
+def test_a_wait_that_runs_past_the_deadline_is_not_taken(audio, server, monkeypatch):
+    """Eight attempts are up to 1580 seconds, which nothing used to bound."""
+    import time
+
+    waits = []
+    monkeypatch.setattr(module.time, "sleep", lambda s: waits.append(s))
+    settings = resolve(
+        base_url=server.base_url, model="chat", stt_model="whisper", require_voice=False
+    )
+    recogniser = module.Recogniser(
+        make_stt_client(settings), "whisper", deadline=time.monotonic() + 20
+    )
+    server.fail_times = 99
+    server.status = 503
+    with pytest.raises(ModelError):
+        recogniser.transcribe_verbose(str(audio))
+    # Only the waits of 5 and 15 fit into 20 seconds, the 60 does not.
+    assert waits == [5, 15]
+    assert server.count("transcribe") == 3
+
+
+def test_without_a_deadline_the_whole_ladder_is_walked(audio, server, monkeypatch):
+    waits = []
+    monkeypatch.setattr(module.time, "sleep", lambda s: waits.append(s))
+    settings = resolve(
+        base_url=server.base_url, model="chat", stt_model="whisper", require_voice=False
+    )
+    recogniser = module.Recogniser(make_stt_client(settings), "whisper")
+    server.fail_times = 99
+    server.status = 503
+    with pytest.raises(ModelError):
+        recogniser.transcribe_verbose(str(audio))
+    assert waits == list(module.Recogniser.BACKOFFS)
+
+
+def test_a_recogniser_says_when_its_time_is_up():
+    import time
+
+    assert module.Recogniser(None, "whisper").out_of_time() is False
+    assert module.Recogniser(None, "whisper", deadline=time.monotonic() - 1).out_of_time()
+    assert not module.Recogniser(None, "whisper", deadline=time.monotonic() + 60).out_of_time()
 
 
 class _Answer:

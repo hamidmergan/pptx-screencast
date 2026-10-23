@@ -185,6 +185,7 @@ Order: argument, then environment variable, then default.
 | `stt_base_url` / `--stt-base-url` | `PPTX_SCREENCAST_STT_BASE_URL` | `base_url` |
 | `stt_model` / `--stt-model` | `PPTX_SCREENCAST_STT_MODEL` | none, required for subtitles |
 | `stt_api_key` / `--stt-api-key` | `PPTX_SCREENCAST_STT_API_KEY` | `api_key` |
+| `stt_timeout` / `--stt-timeout` | `PPTX_SCREENCAST_STT_TIMEOUT` | 900 seconds for the whole subtitle step |
 | `voice` / `--voice` | `PPTX_SCREENCAST_VOICE` | none, required for a video |
 | `speed` / `--speed` | `PPTX_SCREENCAST_SPEED` | 1.0 |
 | `language` / `--language` | `PPTX_SCREENCAST_LANGUAGE` | en |
@@ -217,7 +218,9 @@ Quality depends on the chosen models. A small chat model may misread dense table
 
 LibreOffice renders a deck a little differently than PowerPoint authored it. Fonts that are not installed are substituted, and animations, transitions and embedded video are not part of the picture. Hidden slides are left out.
 
-Subtitle times come from a speech recognition model and are as good as that model. Without one, the video is built without subtitles.
+Subtitle times come from a speech recognition model and are as good as that model. Without one, the video is built without subtitles. The whole subtitle step is bounded by `stt_timeout`. When a recognition server keeps asking for patience and the time runs out, the remaining clips get no cues and the run goes on.
+
+`--burn-in` needs an ffmpeg built with libass. Without it the cues stay in their own track, which every common player can switch on, and a warning says so. The ffmpeg in the Docker image has libass, a Homebrew ffmpeg on macOS usually does not.
 
 ## Running Tests
 

@@ -15,6 +15,12 @@ READ_TIMEOUT = 300.0
 WRITE_TIMEOUT = 10.0
 POOL_TIMEOUT = 10.0
 
+# Attempts the openai client makes of its own. Zero, because the retry policy
+# of the recogniser lives in `stt.Recogniser.BACKOFFS` and the one of the
+# batch in `scripts`. Left at its default of two, every attempt made here
+# would quietly be three requests with waits nobody chose.
+CLIENT_MAX_RETRIES = 0
+
 
 def _timeout() -> Any:
     """A timeout per phase, or a plain read timeout when neither module is there.
@@ -47,6 +53,7 @@ def make_chat_client(settings: Settings):
         api_key=settings.api_key,
         base_url=settings.base_url,
         timeout=_timeout(),
+        max_retries=CLIENT_MAX_RETRIES,
     )
 
 
@@ -58,4 +65,5 @@ def make_stt_client(settings: Settings):
         api_key=settings.stt_api_key,
         base_url=settings.stt_base_url,
         timeout=_timeout(),
+        max_retries=CLIENT_MAX_RETRIES,
     )
