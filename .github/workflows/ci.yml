@@ -15,6 +15,6 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg libreoffice-impress poppler-utils fonts-dejavu
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg libreoffice-impress poppler-utils fontconfig fonts-dejavu
       - run: pip install -e ".[test]"
       - run: pytest -q

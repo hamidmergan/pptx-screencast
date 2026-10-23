@@ -34,7 +34,7 @@ language before it is spoken.
 ## Checklist
 
 - [x] 0 Scaffold: repo, LICENSE (MIT), pyproject, `src/pptx_screencast/`, `tests/`, CI, PLAN.md, README skeleton. ffmpeg and LibreOffice as system requirements, checked at start.
-- [ ] 1 Material: slide text and notes, rendering slides to PNG, slide selection, naming, paths, `config.py`, `errors.py`.
+- [x] 1 Material: slide text and notes, rendering slides to PNG, slide selection, naming, paths, `config.py`, `errors.py`.
 - [ ] 2 Script: narration per slide through the model (the count must match), script file (Markdown, one heading per slide), notes as script, translation.
 - [ ] 3 Audio, subtitles, video: speech per slide, slide duration from the audio, subtitles (VTT, SRT, timing), ffmpeg concat and burn in, outro.
 - [ ] 4 API and CLI: `make_video`, `write_script`, CLI with `--voice`, `--script-only`, `--from-script`, `--notes`, `--translate`, `--subtitles`, `--burn-in`, `--slides`.
@@ -45,4 +45,4 @@ language before it is spoken.
 
 ## Open
 
-- Steps 1 to 8 are open.
+- Steps 2 to 8 are open.
