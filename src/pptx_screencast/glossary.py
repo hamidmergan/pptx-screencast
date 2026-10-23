@@ -1,15 +1,15 @@
 """A fixed term mapping for the narration and for the translation.
 
-A glossary pins how a term has to come out: "Rechenzentrum" always becomes
-"data centre", never "computing centre". The mapping is given to the chat
+A glossary pins how a term has to come out: "data centre" always stays
+"data centre", never becomes "datacenter". The mapping is given to the chat
 model as part of the instruction, so it holds for the narration that is
 written and for a narration that is translated afterwards.
 
 Two file formats are read, picked by what is in the file and not by the
 extension:
 
-* a JSON object, `{"Rechenzentrum": "data centre"}`
-* one line per term, `Rechenzentrum = data centre`, with `#` for a comment
+* a JSON object, `{"datacenter": "data centre"}`
+* one line per term, `datacenter = data centre`, with `#` for a comment
 """
 
 import json

@@ -99,8 +99,9 @@ pptx-screencast deck.pptx --glossary terms.txt --voice alloy ...
 A glossary is one `term = replacement` per line, or a JSON object. Lines starting with `#` are comments:
 
 ```
-Rechenzentrum = data centre
-Folie = slide
+# one term per line
+datacenter = data centre
+Large Language Model = LLM
 ```
 
 Only a few slides, counted from one:
