@@ -46,17 +46,22 @@ def test_every_package_data_folder_exists():
     raise AssertionError("pyproject names no package data")
 
 
-def test_the_workflow_installs_the_speech_package_on_its_own():
-    """pip cannot resolve the sibling from an index yet, so it has its own step."""
-    workflow = _read(".github/workflows/ci.yml")
-    assert "DOC2SPEECH_SOURCE" in workflow
-    assert workflow.index("pip install \"${DOC2SPEECH_SOURCE") < workflow.index('pip install -e ".[test]"')
+def test_the_speech_package_is_pinned_to_its_repository():
+    """No index holds the sibling, so pip is pointed straight at its repository."""
+    pyproject = _read("pyproject.toml")
+    assert "doc2speech @ git+https://github.com/hamidmergan/doc2speech.git" in pyproject
 
 
-def test_the_image_installs_the_speech_package_on_its_own():
+def test_nothing_installs_the_speech_package_on_its_own():
+    """One install command has to be enough, in CI and in the image alike."""
+    for name in (".github/workflows/ci.yml", "Dockerfile", "docker-compose.yml"):
+        assert "DOC2SPEECH_SOURCE" not in _read(name), name
+
+
+def test_the_image_carries_git_for_the_speech_package():
+    """pip clones the sibling repository, which needs git in the image."""
     dockerfile = _read("Dockerfile")
-    assert "ARG DOC2SPEECH_SOURCE" in dockerfile
-    assert "DOC2SPEECH_SOURCE" in _read("docker-compose.yml")
+    assert "git \\" in dockerfile
 
 
 def test_the_readme_names_every_environment_variable():

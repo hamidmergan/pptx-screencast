@@ -243,14 +243,14 @@ Faithful to the source, no user visible harm, worth knowing.
 
 ## Open
 
-- `doc2speech` is declared as a normal version dependency. Until it is on a
-  package index, neither the CI workflow nor the Docker build can resolve it
-  from there. Both now install it as a step of their own, controlled by
-  `DOC2SPEECH_SOURCE`: a repository variable in the workflow and a build
-  argument in the Dockerfile and the compose file. Set it to a pip
-  requirement, for example a git URL or the path of a wheel inside the build
-  context. The default is the plain name `doc2speech`, which works as soon as
-  a version is published.
+- `doc2speech` is settled: no package index is involved anywhere.
+  `pyproject.toml` names its repository
+  (`doc2speech @ git+https://github.com/hamidmergan/doc2speech.git`), so one
+  install command covers both tools and the order does not matter. The CI
+  workflow and the Docker build need nothing of their own for it, and
+  `DOC2SPEECH_SOURCE` is gone from the workflow, the Dockerfile and the
+  compose file. The image carries `git` and needs network access to GitHub
+  while it is built.
 - Burn in needs an ffmpeg built with libass. The image has one, a Homebrew
   ffmpeg on macOS usually does not, and then the cues stay in their own track.
   The README says so.

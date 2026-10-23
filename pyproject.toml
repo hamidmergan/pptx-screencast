@@ -28,7 +28,9 @@ classifiers = [
 ]
 dependencies = [
     "openai>=1.30",
-    "doc2speech>=0.1.0",
+    # doc2speech is a sibling tool and comes straight from its repository, so one
+    # install command is enough and the order does not matter.
+    "doc2speech @ git+https://github.com/hamidmergan/doc2speech.git",
     "python-pptx>=0.6.21",
     "Pillow>=9.0",
 ]

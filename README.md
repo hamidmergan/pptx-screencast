@@ -24,22 +24,30 @@ If you run your own models, your decks stay on your own network. Nothing leaves 
 
 ## Installation
 
-```bash
-pip install pptx-screencast
-```
-
-Alternatively, you can install it from the source:
+pptx-screencast is installed from GitHub:
 
 ```bash
-git clone https://github.com/hamidmergan/pptx-screencast.git
-cd pptx-screencast
-pip install .
+pip install git+https://github.com/hamidmergan/pptx-screencast.git
 ```
 
 The web page needs a few extra packages:
 
 ```bash
-pip install "pptx-screencast[ui]"
+pip install "pptx-screencast[ui] @ git+https://github.com/hamidmergan/pptx-screencast.git"
+```
+
+The speaking is done by [doc2speech](https://github.com/hamidmergan/doc2speech), a
+sibling tool from the same set of document tools. Its repository is named in
+`pyproject.toml`, so the command above brings it in as well and there is no order to
+keep. `git` has to be on your PATH, because pip fetches both repositories with it.
+
+Alternatively, you can install it from a local copy (`pip install ".[ui]"` for the
+web page):
+
+```bash
+git clone https://github.com/hamidmergan/pptx-screencast.git
+cd pptx-screencast
+pip install .
 ```
 
 ## Usage
@@ -186,6 +194,8 @@ docker compose up
 ```
 
 The page is then on <http://127.0.0.1:8000>. Put your server and model names into the environment variables in `docker-compose.yml` or into a `.env` file next to it.
+
+The image installs doc2speech from its repository during the build, so the build needs network access to GitHub. `git` is in the image for that.
 
 ### Settings
 

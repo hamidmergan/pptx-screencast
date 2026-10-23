@@ -16,12 +16,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg libreoffice-impress poppler-utils fontconfig fonts-dejavu
-      # doc2speech is a sibling package and is not on a package index yet, so
-      # it is installed on its own first. Set the repository variable
-      # DOC2SPEECH_SOURCE to a pip requirement, for example a git URL, until
-      # a released version can be resolved by name.
-      - run: pip install "${DOC2SPEECH_SOURCE:-doc2speech}"
-        env:
-          DOC2SPEECH_SOURCE: ${{ vars.DOC2SPEECH_SOURCE }}
+      # doc2speech is a sibling package and is pulled from its repository by pip,
+      # so it needs no step of its own.
       - run: pip install -e ".[test]"
       - run: pytest -q
