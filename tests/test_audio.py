@@ -226,11 +226,27 @@ def test_a_foreign_speed_variable_is_pointed_out(tmp_path, server, monkeypatch, 
 
 
 def test_a_whole_deck_against_a_dead_server_costs_one_ladder(tmp_path, server, monkeypatch):
-    """The run stops asking as soon as one part has given up for good."""
+    """The run stops asking as soon as one part has given up for good.
+
+    40 slides of 6 parts each used to be 960 requests against a server that
+    is down. Now only the parts that are in flight walk their ladder, so the
+    cost is bounded by the number of workers and not by the deck.
+    """
     monkeypatch.setattr(module, "RETRY_DELAYS", (0.0, 0.0, 0.0))
     server.fail_times = 99
     server.status = 503
     with pytest.raises(ModelError):
         module.speak_all([LONG_SCRIPT] * 40, tmp_path, _settings(server), max_workers=4)
-    # Four parts in flight, four attempts each, and nothing after that.
-    assert server.count("speech") == 16
+    attempts = len(module.RETRY_DELAYS) + 1
+    assert attempts <= server.count("speech") <= 4 * attempts
+
+
+def test_one_worker_against_a_dead_deck_pays_exactly_one_ladder(
+    tmp_path, server, monkeypatch
+):
+    monkeypatch.setattr(module, "RETRY_DELAYS", (0.0, 0.0, 0.0))
+    server.fail_times = 99
+    server.status = 503
+    with pytest.raises(ModelError):
+        module.speak_all([LONG_SCRIPT] * 40, tmp_path, _settings(server), max_workers=1)
+    assert server.count("speech") == 4

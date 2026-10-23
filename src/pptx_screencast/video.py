@@ -44,12 +44,10 @@ def _run(cmd: List[str], timeout: int, what: str) -> subprocess.CompletedProcess
         raise VideoError(f"{what} could not be started: {exc}")
 
 
-def _proc(
-    cmd: List[str], timeout: int, run_id: Optional[str], what: str
-) -> subprocess.CompletedProcess:
+def _proc(cmd: List[str], timeout: int, what: str) -> subprocess.CompletedProcess:
     """The same for the calls that run in their own session."""
     try:
-        return run_proc(cmd, timeout=timeout, run_id=run_id)
+        return run_proc(cmd, timeout=timeout)
     except OSError as exc:
         raise VideoError(f"{what} could not be started: {exc}")
 
@@ -96,7 +94,7 @@ def get_video_duration(video_path: Path) -> float:
         raise VideoError(f"The clip length cannot be measured: {video_path}")
 
 
-def apply_speed(audio_path: Path, output_path: Path, speed: float, run_id: Optional[str] = None) -> Path:
+def apply_speed(audio_path: Path, output_path: Path, speed: float) -> Path:
     """Slow down or speed up locally, so the pitch of the voice stays."""
     stretched = output_path.with_suffix(".speed.mp3")
     cmd = [
@@ -104,7 +102,7 @@ def apply_speed(audio_path: Path, output_path: Path, speed: float, run_id: Optio
         "-filter:a", f"atempo={speed}",
         "-c:a", "libmp3lame", "-q:a", "2", str(stretched),
     ]
-    result = _proc(cmd, SPEED_TIMEOUT, run_id, "Changing the speed")
+    result = _proc(cmd, SPEED_TIMEOUT, "Changing the speed")
     if result.returncode != 0:
         logger.warning(
             "Speed %s cannot be applied, taking the audio as it is: %s",
@@ -120,7 +118,6 @@ def create_slide_video(
     output_path: Path,
     pause: float = 0.0,
     crf: int = 23,
-    run_id: Optional[str] = None,
     silent_duration: float = SILENT_DURATION,
     speed: float = 1.0,
     fps: int = _FRAME_RATE,
@@ -149,7 +146,7 @@ def create_slide_video(
             "-shortest",
             str(output_path),
         ]
-        result = _proc(cmd, CLIP_TIMEOUT, run_id, "Building the silent clip")
+        result = _proc(cmd, CLIP_TIMEOUT, "Building the silent clip")
         if result.returncode != 0:
             logger.error("The clip could not be built (rc=%s): %s", result.returncode, result.stderr[-500:])
             raise VideoError(f"The silent clip could not be built: {result.stderr[-300:]}")
@@ -157,7 +154,7 @@ def create_slide_video(
 
     # Many servers lower the pitch when they slow a voice down, so it happens here.
     if speed and abs(speed - 1.0) > 0.001:
-        audio_path = apply_speed(audio_path, output_path, speed, run_id)
+        audio_path = apply_speed(audio_path, output_path, speed)
 
     duration = get_audio_duration(audio_path)
 
@@ -170,7 +167,7 @@ def create_slide_video(
             "-ac", "2", "-ar", "44100",
             "-c:a", "libmp3lame", str(silence_path),
         ]
-        silence = _proc(cmd_silence, PAUSE_TIMEOUT, run_id, "Making the pause")
+        silence = _proc(cmd_silence, PAUSE_TIMEOUT, "Making the pause")
         if silence.returncode != 0:
             raise VideoError(f"The pause could not be made: {silence.stderr[-300:]}")
 
@@ -185,7 +182,7 @@ def create_slide_video(
             "-i", str(concat_audio_file),
             "-c", "copy", str(audio_with_pause_path),
         ]
-        joined = _proc(cmd_concat, PAUSE_TIMEOUT, run_id, "Putting the pause behind the narration")
+        joined = _proc(cmd_concat, PAUSE_TIMEOUT, "Putting the pause behind the narration")
         if joined.returncode != 0:
             raise VideoError(
                 f"The pause could not be put behind the narration: {joined.stderr[-300:]}"
@@ -208,7 +205,7 @@ def create_slide_video(
         "-shortest",
         str(output_path),
     ]
-    result = _proc(cmd, CLIP_TIMEOUT, run_id, "Building the clip")
+    result = _proc(cmd, CLIP_TIMEOUT, "Building the clip")
     if result.returncode != 0:
         logger.error("The clip could not be built (rc=%s): %s", result.returncode, result.stderr[-500:])
         raise VideoError(f"The clip could not be built: {result.stderr[-300:]}")

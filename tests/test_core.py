@@ -418,3 +418,48 @@ def test_the_subtitle_step_has_a_time_limit():
         base_url="http://127.0.0.1:1/v1", model="chat", stt_timeout=60.0, require_voice=False
     )
     assert settings.stt_timeout == 60.0
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_burned_in_cues_are_not_in_the_file_twice(deck, server, tmp_path, no_libreoffice, monkeypatch):
+    """A player that switches subtitles on would otherwise show them twice."""
+    def _copy(src, track, out, crf=23):
+        out.write_bytes(src.read_bytes())
+        return out
+
+    monkeypatch.setattr(core, "burn_in_subtitles", _copy)
+    out = core.make_video(
+        deck, tmp_path / "deck.mp4",
+        **_options(server, subtitles=True, burn_in=True, stt_model="whisper"),
+    )
+    assert "subtitle" not in _streams(out)
+    # The cues are still next to the video, so they can be used elsewhere.
+    assert out.with_suffix(".vtt").exists()
+    assert out.with_suffix(".srt").exists()
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_a_failed_burn_in_keeps_the_track_in_the_file(deck, server, tmp_path, no_libreoffice, monkeypatch):
+    monkeypatch.setattr(core, "burn_in_subtitles", lambda src, track, out, crf=23: src)
+    out = core.make_video(
+        deck, tmp_path / "deck.mp4",
+        **_options(server, subtitles=True, burn_in=True, stt_model="whisper"),
+    )
+    assert "subtitle" in _streams(out)
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_the_summed_clips_stay_close_to_the_joined_timeline(
+    deck, server, tmp_path, no_libreoffice
+):
+    """The cue offsets are summed clip lengths, so the drift has to stay small."""
+    work = tmp_path / "work"
+    out = core.make_video(
+        deck, tmp_path / "deck.mp4", work_dir=str(work), **_options(server)
+    )
+    notice = get_video_duration(work / "clip_notice.mp4")
+    clips = [get_video_duration(work / f"clip_{i:03d}.mp4") for i in range(4)]
+    summed = sum(clips) + 2 * notice
+    drift = abs(get_video_duration(out) - summed)
+    # About 8 ms per clip, measured. Six clips must stay well under a tenth.
+    assert drift < 0.1, f"{drift} seconds of drift over {len(clips) + 2} clips"

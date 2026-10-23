@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `write_script` writes the narration as a Markdown file with one heading per slide, so it can be read and corrected before anything is spoken.
 - Three sources for the narration: the chat model, the speaker notes of the deck, or a script file.
 - Translation of a finished narration through the chat model.
-- Subtitles recognized from the spoken audio, written as VTT and SRT and added to the MP4 as its own track, optionally burned into the picture.
+- Subtitles recognised from the spoken audio, written as VTT and SRT and added to the MP4 as its own track, optionally burned into the picture.
 - A notice slide at the start and the end of the video, and the same sentence in the metadata of the file.
 - Slide selection with `--slides 1-5,8`, speaking speed, pause between slides, resolution and video quality as settings.
 - Command line `pptx-screencast` with `--script-only`, `--from-script`, `--notes`, `--translate`, `--subtitles`, `--burn-in` and `--slides`.

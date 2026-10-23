@@ -63,3 +63,17 @@ def test_the_readme_names_every_environment_variable():
     readme = _read("README.md")
     for _, env_name, _ in config.PAGE_SETTINGS:
         assert config.ENV_PREFIX + env_name in readme, env_name
+
+
+def test_the_spelling_of_recognise_does_not_drift():
+    """The code and the log messages are British, so the texts have to be too."""
+    for name in ("README.md", "CHANGELOG.md", "PLAN.md"):
+        text = _read(name).lower()
+        assert "recognize" not in text, name
+        assert "recognized" not in text, name
+        assert "recogniser" in text or "recognis" in text or "recognition" in text, name
+
+
+def test_the_readme_names_the_libass_requirement():
+    readme = _read("README.md")
+    assert "libass" in readme

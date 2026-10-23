@@ -272,13 +272,18 @@ def make_video(
         _report(progress, "join", 0, 1)
         joined = tmp / "joined.mp4"
         concatenate_videos(clips, joined)
+        burned = False
         if track is not None and resolved.burn_in:
-            joined = burn_in_subtitles(joined, track, tmp / "burned.mp4", crf=resolved.crf)
+            drawn = burn_in_subtitles(joined, track, tmp / "burned.mp4", crf=resolved.crf)
+            # The cues are in the picture now, so a second track in the file
+            # would show them twice in a player that switches subtitles on.
+            burned = drawn != joined
+            joined = drawn
 
         final = tmp / "final.mp4"
         data = apply_faststart(
             joined, final,
-            subtitle_path=track,
+            subtitle_path=None if burned else track,
             subtitle_lang=vtt_language_code(translate or resolved.language),
         )
         try:

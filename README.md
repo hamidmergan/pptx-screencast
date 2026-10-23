@@ -8,7 +8,7 @@ The narration can come from three places:
 - the speaker notes of the deck
 - a Markdown script file you wrote or corrected by hand
 
-Subtitles are optional. They are recognized from the spoken audio with a speech recognition model, so the cue times match what is really heard, and they are written as VTT and SRT next to the video.
+Subtitles are optional. They are recognised from the spoken audio with a speech recognition model, so the cue times match what is really heard, and they are written as VTT and SRT next to the video.
 
 ## Prerequisites
 
@@ -115,7 +115,7 @@ Subtitles as their own track in the MP4, plus `deck.vtt` and `deck.srt` next to 
 pptx-screencast deck.pptx --subtitles --stt-model your-stt-model --voice alloy ...
 ```
 
-Add `--burn-in` to draw the cues into the picture as well. That re-encodes the video and needs an ffmpeg built with libass.
+Add `--burn-in` to draw the cues into the picture as well. That re-encodes the video and needs an ffmpeg built with libass. When the cues are drawn in, the MP4 gets no separate subtitle track, so a player cannot show them twice. The `.vtt` and `.srt` files are written either way.
 
 Progress goes to stderr, the path of the finished file to stdout. `-q` keeps the progress out. The exit code is 1 when the run failed and 2 when the arguments do not fit together.
 
