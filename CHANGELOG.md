@@ -19,5 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Command line `pptx-screencast` with `--script-only`, `--from-script`, `--notes`, `--translate`, `--subtitles`, `--burn-in` and `--slides`.
 - Web page under `pptx-screencast serve`, plus a Dockerfile and a compose file that bring LibreOffice, poppler and ffmpeg with them.
 - Separate `base_url`, `model` and `api_key` for chat, speech and speech recognition, each falling back to the chat values.
+- A glossary that pins how a term has to come out, as `--glossary FILE` or as a `dict`, applied to the narration and to the translation.
+- Extra text per slide as `materials`, which the model may use to make a narration concrete.
+- A warning naming the slides a translation handed back unchanged.
+- `--stt-timeout` bounds the whole subtitle step, and the step reports every recognised clip.
+
+### Fixed
+
+- A relative `--work-dir` broke every clip and the join, because ffmpeg reads a concat entry relative to the list file. The work directory is resolved and the lists hold absolute paths.
+- A reused `--work-dir` could build the video from the slide images of an earlier run.
+- The retry ladder for the voice sits on the spoken part instead of the whole slide, and a part that gives up for good stops the rest of the run.
+- The `fps` setting now decides the frame rate of the clips. Nothing read it before.
+- The clips are cut side by side, as `--max-workers` promises.
+- The speech step counts only the slides it speaks, so the progress no longer jumps backwards.
+- An unticked box on the page switches subtitles or burn in off, even when the environment switches them on, and `/api/info` reports the pause, the resolution and both boxes from the environment.
+- A deck that cannot be read is reported as an error instead of a traceback.
+- A stuck or missing LibreOffice, poppler or ffmpeg is reported as an error of this package.
+- A retry of the recogniser is decided from the status code alone, never from the message text.
+- The corrected copy of the deck is written into the work folder, so a deck on a read-only share renders as well.
+- A path with a quote, a colon or an equal sign in it is escaped for both levels ffmpeg reads a filter at.
+- Burned-in cues are no longer also added as a separate subtitle track.
 
 [0.1.0]: https://github.com/hamidmergan/pptx-screencast/releases/tag/v0.1.0
