@@ -51,7 +51,7 @@ pptx-screencast = "pptx_screencast.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-pptx_screencast = ["py.typed", "web/static/*", "assets/*"]
+pptx_screencast = ["py.typed", "web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

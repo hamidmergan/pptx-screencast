@@ -3,3 +3,7 @@
 .pytest_cache
 __pycache__
 *.egg-info
+private
+.env
+.*/
+*.mp4

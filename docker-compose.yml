@@ -1,6 +1,11 @@
 services:
   pptx-screencast:
-    build: .
+    build:
+      context: .
+      args:
+        # Until doc2speech is on a package index, point this at a pip
+        # requirement, for example a git URL or a wheel in this folder.
+        DOC2SPEECH_SOURCE: ${DOC2SPEECH_SOURCE:-doc2speech}
     ports:
       # Set PPTX_SCREENCAST_PORT if 8000 is already taken on your machine.
       - "${PPTX_SCREENCAST_PORT:-8000}:8000"
@@ -20,12 +25,24 @@ services:
       PPTX_SCREENCAST_STT_BASE_URL: ${PPTX_SCREENCAST_STT_BASE_URL:-}
       PPTX_SCREENCAST_STT_MODEL: ${PPTX_SCREENCAST_STT_MODEL:-}
       PPTX_SCREENCAST_STT_API_KEY: ${PPTX_SCREENCAST_STT_API_KEY:-}
+      PPTX_SCREENCAST_STT_TIMEOUT: ${PPTX_SCREENCAST_STT_TIMEOUT:-}
       # Optional defaults of the page.
       PPTX_SCREENCAST_LANGUAGE: ${PPTX_SCREENCAST_LANGUAGE:-}
       PPTX_SCREENCAST_SPEED: ${PPTX_SCREENCAST_SPEED:-}
       PPTX_SCREENCAST_SLIDE_PAUSE: ${PPTX_SCREENCAST_SLIDE_PAUSE:-}
       PPTX_SCREENCAST_RESOLUTION: ${PPTX_SCREENCAST_RESOLUTION:-}
       PPTX_SCREENCAST_SUBTITLES: ${PPTX_SCREENCAST_SUBTITLES:-}
+      PPTX_SCREENCAST_BURN_IN: ${PPTX_SCREENCAST_BURN_IN:-}
+      PPTX_SCREENCAST_FPS: ${PPTX_SCREENCAST_FPS:-}
+      PPTX_SCREENCAST_CRF: ${PPTX_SCREENCAST_CRF:-}
+      # Length of one narration and how the slides are grouped per chat request.
+      PPTX_SCREENCAST_MIN_CHARS: ${PPTX_SCREENCAST_MIN_CHARS:-}
+      PPTX_SCREENCAST_MAX_CHARS: ${PPTX_SCREENCAST_MAX_CHARS:-}
+      PPTX_SCREENCAST_BATCH_SIZE: ${PPTX_SCREENCAST_BATCH_SIZE:-}
+      PPTX_SCREENCAST_BATCH_MAX_WORKERS: ${PPTX_SCREENCAST_BATCH_MAX_WORKERS:-}
+      PPTX_SCREENCAST_BATCH_TIMEOUT: ${PPTX_SCREENCAST_BATCH_TIMEOUT:-}
       PPTX_SCREENCAST_MAX_SLIDES: ${PPTX_SCREENCAST_MAX_SLIDES:-}
       PPTX_SCREENCAST_MAX_WORKERS: ${PPTX_SCREENCAST_MAX_WORKERS:-}
+      # Where the slide images, the audio and the clips of a run are kept.
+      PPTX_SCREENCAST_WORK_DIR: ${PPTX_SCREENCAST_WORK_DIR:-}
     restart: unless-stopped
