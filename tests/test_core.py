@@ -338,3 +338,40 @@ def test_the_srt_holds_the_same_cues_as_the_vtt(deck, server, tmp_path, no_libre
     assert [(round(c["start"], 3), c["text"]) for c in srt] == [
         (round(c["start"], 3), c["text"]) for c in vtt
     ]
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_the_clips_are_cut_side_by_side(deck, server, tmp_path, no_libreoffice, monkeypatch):
+    """--max-workers has to mean something for the cut as well, not only the voice."""
+    import threading
+
+    open_now = [0]
+    seen = [0]
+    lock = threading.Lock()
+    real = core.create_slide_video
+
+    def counting(*args, **kwargs):
+        with lock:
+            open_now[0] += 1
+            seen[0] = max(seen[0], open_now[0])
+        try:
+            return real(*args, **kwargs)
+        finally:
+            with lock:
+                open_now[0] -= 1
+
+    monkeypatch.setattr(core, "create_slide_video", counting)
+    out = core.make_video(deck, tmp_path / "deck.mp4", max_workers=4, **_options(server))
+    assert get_video_duration(out) > 0
+    assert seen[0] > 1, "the clips were cut one after another"
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="ffmpeg and ffprobe are not installed")
+def test_one_worker_still_cuts_every_clip(deck, server, tmp_path, no_libreoffice):
+    work = tmp_path / "work"
+    core.make_video(
+        deck, tmp_path / "deck.mp4", max_workers=1, work_dir=str(work), **_options(server)
+    )
+    assert sorted(p.name for p in work.glob("clip_0*.mp4")) == [
+        f"clip_{i:03d}.mp4" for i in range(4)
+    ]

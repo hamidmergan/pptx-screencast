@@ -7,7 +7,9 @@ from the deck to the finished MP4 and can start from such a script file.
 
 import logging
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Lock
 from typing import Callable, List, Optional, Sequence, Union
 
 from . import config
@@ -235,13 +237,7 @@ def make_video(
         clips = [tmp / f"clip_{position:03d}.mp4" for position, _ in pairs]
         total_clips = len(pairs)
         _report(progress, "video", 0, total_clips)
-        for done, ((position, index), clip) in enumerate(zip(pairs, clips), start=1):
-            create_slide_video(
-                images[index], audio_paths[index], clip,
-                pause=resolved.slide_pause, crf=resolved.crf, speed=resolved.speed,
-                fps=resolved.fps,
-            )
-            _report(progress, "video", done, total_clips)
+        _cut_clips(pairs, clips, images, audio_paths, resolved, progress, total_clips)
 
         has_speech = [audio_paths[index] is not None for _, index in pairs]
         # The notice has to come before the subtitles, otherwise every time is off.
@@ -273,6 +269,48 @@ def make_video(
             _write_subtitle_files(track, target)
         _report(progress, "join", 1, 1)
     return target
+
+
+def _cut_clips(
+    pairs: Sequence[tuple],
+    clips: Sequence[Path],
+    images: Sequence[Path],
+    audio_paths: Sequence[Optional[Path]],
+    settings: config.Settings,
+    progress: Optional[Progress],
+    total: int,
+) -> None:
+    """One clip per slide, `max_workers` of them at the same time.
+
+    Every clip is an encode of a still picture and does not depend on any
+    other, so they are cut side by side, just like the rendering and the
+    speaking.
+    """
+    done = [0]
+    lock = Lock()
+
+    def _one(item) -> None:
+        (_position, index), clip = item
+        create_slide_video(
+            images[index], audio_paths[index], clip,
+            pause=settings.slide_pause, crf=settings.crf, speed=settings.speed,
+            fps=settings.fps,
+        )
+        if progress is None:
+            return
+        with lock:
+            done[0] += 1
+            _report(progress, "video", done[0], total)
+
+    work = list(zip(pairs, clips))
+    workers = max(1, min(settings.max_workers, len(work) or 1))
+    if workers == 1:
+        for item in work:
+            _one(item)
+        return
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for _ in pool.map(_one, work):
+            pass
 
 
 def _fresh(folder: Path) -> Path:
