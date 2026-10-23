@@ -63,11 +63,14 @@ were changed on purpose.
   policy of a slide lives in `RETRY_DELAYS` alone: four attempts, waiting 2, 5
   and 10 seconds. Covered by
   `test_a_dead_server_is_asked_exactly_once_per_attempt`.
-- **A busy speech server is recognised by its status, not by one spelling.**
-  The source matched the literal `(503)` its own client produced. doc2speech
-  writes `Error code: 503`, so no retry here ever fired and only the attempts
-  inside doc2speech were doing the work. Both spellings are matched now, and a
-  status that will not change, such as 401, is still not transient.
+- **A busy speech server is recognised by the verdict on the error.** The
+  source matched the literal `(503)` its own client produced. doc2speech words
+  the same failure differently, so no retry here ever fired and only the
+  attempts inside doc2speech were doing the work. doc2speech now reports the
+  verdict itself, so `is_transient` reads `exc.transient` and no message text
+  at all. No answer, 408, 429 and every 5xx are worth another try, every other
+  answer is final, and so is anything that is not the server's fault, such as
+  a missing setting or an empty text.
 
 ## Open
 

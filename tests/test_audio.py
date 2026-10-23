@@ -106,15 +106,30 @@ def test_a_refused_request_is_not_retried(tmp_path, server, monkeypatch):
     assert waits == []
 
 
-@pytest.mark.parametrize("message, transient", [
-    ("Request failed (503)", True),
-    ("Request failed (429)", True),
-    ("Request to http://x/v1 failed: Error code: 503 - {'message': 'busy'}", True),
-    ("Error code: 500", True),
-    ("Request failed (401)", False),
-    ("Request to http://x/v1 failed: Error code: 401 - invalid key", False),
-    ("Request failed, nothing came back", False),
+@pytest.mark.parametrize("status, transient", [
+    (None, True),   # no answer arrived at all, a timeout or a refused connection
+    (408, True),
+    (429, True),
+    (500, True),
+    (502, True),
+    (503, True),
+    (504, True),
+    (400, False),
+    (401, False),
+    (403, False),
+    (404, False),
 ])
-def test_a_transient_error_is_told_apart_from_a_refusal(message, transient):
-    """Both wordings count, the voice and the source client phrase it differently."""
-    assert module.is_transient(RuntimeError(message)) is transient
+def test_the_voice_decides_what_is_worth_another_try(status, transient):
+    """The verdict comes from the error itself, no message text is read."""
+    from doc2speech import ModelError as VoiceError
+
+    assert module.is_transient(VoiceError("nope", status)) is transient
+
+
+def test_a_failure_that_is_not_the_servers_is_final():
+    """A missing setting or an empty text does not change on another try."""
+    from doc2speech import ConfigError, EmptyTextError
+
+    assert not module.is_transient(ConfigError("Missing: voice"))
+    assert not module.is_transient(EmptyTextError("Please enter some text."))
+    assert not module.is_transient(RuntimeError("something else entirely"))
