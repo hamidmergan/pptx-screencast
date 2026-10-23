@@ -55,12 +55,73 @@ def test_a_refusal_is_not_retried(recogniser, audio, server, monkeypatch):
     assert server.count("transcribe") == 1
 
 
-@pytest.mark.parametrize("message, transient", [
-    ("service unavailable", True),
-    ("gateway timeout", True),
-    ("rate limit reached", True),
-    ("connection reset", True),
-    ("Error code: 401 - invalid key", False),
+class _Answer:
+    def __init__(self, status):
+        self.status_code = status
+
+
+class _Refused(Exception):
+    def __init__(self, status):
+        super().__init__("the server said no")
+        self.status_code = status
+
+
+@pytest.mark.parametrize("status, transient", [
+    (408, True),
+    (429, True),
+    (500, True),
+    (502, True),
+    (503, True),
+    (504, True),
+    (400, False),
+    (401, False),
+    (403, False),
+    (404, False),
+    (200, False),
 ])
-def test_transient_errors_are_told_apart(message, transient):
-    assert module.is_transient_error(RuntimeError(message)) is transient
+def test_transient_errors_are_told_apart_by_their_status(status, transient):
+    assert module.is_transient_error(_Refused(status)) is transient
+
+
+def test_the_status_is_also_read_off_the_answer():
+    error = RuntimeError("something")
+    error.response = _Answer(503)
+    assert module.is_transient_error(error) is True
+
+
+def test_the_status_is_also_read_off_the_cause():
+    try:
+        try:
+            raise _Refused(429)
+        except _Refused as inner:
+            raise RuntimeError("wrapped") from inner
+    except RuntimeError as outer:
+        assert module.is_transient_error(outer) is True
+
+
+@pytest.mark.parametrize("message", [
+    "service unavailable",
+    "gateway timeout",
+    "rate limit reached",
+    "connection reset",
+    "model does not support connection pooling",
+])
+def test_no_message_text_decides_about_a_retry(message):
+    """A 400 that mentions a timeout must not start a ladder of waits."""
+    assert module.is_transient_error(RuntimeError(message)) is False
+
+
+def test_a_refused_connection_is_transient():
+    import httpx
+    from openai import APIConnectionError
+
+    error = APIConnectionError(request=httpx.Request("POST", "http://127.0.0.1:1/v1"))
+    assert module.is_transient_error(error) is True
+
+
+def test_a_timeout_is_transient():
+    import httpx
+    from openai import APITimeoutError
+
+    error = APITimeoutError(request=httpx.Request("POST", "http://127.0.0.1:1/v1"))
+    assert module.is_transient_error(error) is True

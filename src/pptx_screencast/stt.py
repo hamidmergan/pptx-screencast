@@ -8,21 +8,55 @@ through a speech recognition model, which answers with a segment per phrase.
 import json
 import logging
 import time
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Statuses worth another attempt that are not a 5xx.
+RETRY_STATUS = frozenset({408, 429})
+
+
+def status_of(e: BaseException) -> Optional[int]:
+    """The HTTP status an SDK or transport error carries, None without one.
+
+    The code is read off the object, never parsed out of a message text. A
+    message is free prose: a 400 that happens to mention the word "timeout"
+    would otherwise start a ladder of waits that cannot help.
+    """
+    seen: set = set()
+    current: Optional[BaseException] = e
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        for holder in (current, getattr(current, "response", None)):
+            status = getattr(holder, "status_code", None)
+            if isinstance(status, int):
+                return status
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def _no_answer_arrived(e: BaseException) -> bool:
+    """True for a refused connection or a timeout, which carry no status."""
+    try:
+        from openai import APIConnectionError
+    except ImportError:  # pragma: no cover - openai is a hard dependency
+        return False
+    # APITimeoutError is a subclass of APIConnectionError.
+    return isinstance(e, APIConnectionError)
+
 
 def is_transient_error(e: Exception) -> bool:
-    """Upstream failures worth another attempt: 5xx, 429, timeouts, lost connections."""
-    status = getattr(e, "status_code", None) or getattr(getattr(e, "response", None), "status_code", None)
-    if isinstance(status, int) and (500 <= status < 600 or status == 429):
-        return True
-    msg = str(e).lower()
-    return any(kw in msg for kw in (
-        "internal server error", "bad gateway", "service unavailable",
-        "gateway timeout", "timeout", "connection", "temporarily",
-        "rate limit", "429",
-    ))
+    """True when another attempt can help.
+
+    The verdict follows the status the server sent: 408, 429 and every 5xx
+    are worth another try, every other answer is final. An error that never
+    reached a server at all, a refused connection or a timeout, is transient
+    too. Everything else, a bug in the answer or in this code, is final.
+    """
+    status = status_of(e)
+    if status is not None:
+        return status in RETRY_STATUS or 500 <= status < 600
+    return _no_answer_arrived(e)
 
 
 class Recogniser:
