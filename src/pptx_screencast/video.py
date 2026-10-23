@@ -66,7 +66,7 @@ def get_video_duration(video_path: Path) -> float:
 
 def apply_speed(audio_path: Path, output_path: Path, speed: float, run_id: Optional[str] = None) -> Path:
     """Slow down or speed up locally, so the pitch of the voice stays."""
-    stretched = output_path.with_suffix(".tempo.mp3")
+    stretched = output_path.with_suffix(".speed.mp3")
     cmd = [
         "ffmpeg", "-y", "-i", str(audio_path),
         "-filter:a", f"atempo={speed}",

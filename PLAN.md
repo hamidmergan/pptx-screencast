@@ -40,9 +40,9 @@ language before it is spoken.
 - [x] 4 API and CLI: `make_video`, `write_script`, CLI with `--voice`, `--script-only`, `--from-script`, `--notes`, `--translate`, `--subtitles`, `--burn-in`, `--slides`.
 - [x] 5 Tests with a fake server for chat, speech and recognition.
 - [x] 6 README, CHANGELOG 0.1.0, local smoke test with a real model.
-- [ ] 7 English sweep, acceptance checks, final commit.
+- [x] 7 English sweep, acceptance checks, final commit.
 - [ ] 8 Web UI and Docker.
 
 ## Open
 
-- Steps 7 and 8 are open.
+- Step 8 is open.
