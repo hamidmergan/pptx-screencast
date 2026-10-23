@@ -8,6 +8,7 @@ from . import __version__
 from . import config
 from .core import make_video, write_script
 from .errors import ScreencastError
+from .glossary import read_glossary
 from .selection import parse_slides
 
 LOOPBACK = ("127.0.0.1", "localhost", "::1")
@@ -68,6 +69,11 @@ def _parser() -> argparse.ArgumentParser:
         "--translate",
         metavar="LANGUAGE",
         help="Translate the narration into this language before it is spoken, e.g. en",
+    )
+    p.add_argument(
+        "--glossary",
+        metavar="FILE",
+        help="Pin terms, one 'term = replacement' per line or a JSON object",
     )
     p.add_argument("--slides", help="Only these slides, e.g. 1-5,8")
     p.add_argument("--voice", help="Voice of the speech model, e.g. alloy (required for a video)")
@@ -204,12 +210,14 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         slides = parse_slides(args.slides) if args.slides else None
+        glossary = read_glossary(args.glossary) if args.glossary else None
         if args.script_only:
             written = write_script(
                 deck,
                 args.output,
                 notes=args.notes,
                 translate=args.translate or "",
+                glossary=glossary,
                 progress=_progress(args.quiet),
                 **_model_options(args),
             )
@@ -220,6 +228,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 script=args.from_script,
                 notes=args.notes,
                 translate=args.translate or "",
+                glossary=glossary,
                 slides=slides,
                 progress=_progress(args.quiet),
                 **_options(args),

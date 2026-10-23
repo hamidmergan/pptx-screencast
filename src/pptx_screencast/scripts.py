@@ -12,6 +12,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from .glossary import glossary_hint as _glossary_hint
 from .upstream import is_provider_refusal
 
 logger = logging.getLogger(__name__)
@@ -77,13 +78,6 @@ class _ScriptMisaligned(RuntimeError):
     def __init__(self, slide_index: int):
         super().__init__(f"Slide {slide_index + 1} of the batch tells another slide's script")
         self.slide_index = slide_index
-
-
-def _glossary_hint(glossary: dict[str, str] | None) -> str:
-    if not glossary:
-        return ""
-    lines = "\n".join(f"- {k} → {v}" for k, v in glossary.items())
-    return f"Use the following terminology consistently in your output:\n{lines}\n\n"
 
 
 def build_length_and_format_rules(

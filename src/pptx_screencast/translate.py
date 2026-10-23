@@ -8,6 +8,8 @@ already written and only need another language.
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
+from .glossary import glossary_hint
+
 logger = logging.getLogger(__name__)
 
 TRANSLATE_PROMPT = (
@@ -27,11 +29,23 @@ TRANSLATE_PROMPT = (
 class _TranslateMixin:
     """Expects client and model on the object."""
 
-    def translate_text(self, text: str, target_lang: str) -> str:
-        """One text in the target language, empty input stays empty."""
+    def translate_text(
+        self,
+        text: str,
+        target_lang: str,
+        glossary: dict[str, str] | None = None,
+    ) -> str:
+        """One text in the target language, empty input stays empty.
+
+        A glossary pins the terms, the same way it does when the narration is
+        written, so a term does not change its wording on the way out.
+        """
         if not text or not text.strip() or not (target_lang or "").strip():
             return text
-        system_prompt = TRANSLATE_PROMPT.replace("{language}", target_lang.strip())
+        system_prompt = (
+            glossary_hint(glossary)
+            + TRANSLATE_PROMPT.replace("{language}", target_lang.strip())
+        )
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
@@ -56,6 +70,7 @@ class _TranslateMixin:
         texts: list[str],
         target_lang: str,
         max_workers: int | None = None,
+        glossary: dict[str, str] | None = None,
     ) -> list[str]:
         """Every text on its own request, the order is kept.
 
@@ -72,7 +87,7 @@ class _TranslateMixin:
             if not text.strip():
                 return text
             try:
-                return self.translate_text(text, target_lang)
+                return self.translate_text(text, target_lang, glossary)
             except Exception as e:
                 logger.warning("Slide %s was not translated: %s", index + 1, e)
                 return text

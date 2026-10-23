@@ -168,3 +168,32 @@ def test_the_fps_flag_reaches_the_settings(deck, server, tmp_path, no_libreoffic
     cli.main([str(deck), "-o", str(tmp_path / "out.mp4"), "--fps", "18",
               *_model(server), "--voice", "alloy", "--tts-model", "tts", "-q"])
     assert seen["fps"] == 18
+
+
+def test_the_glossary_flag_reaches_the_prompt(deck, server, tmp_path):
+    terms = tmp_path / "terms.txt"
+    terms.write_text("Rechenzentrum = data centre\n", encoding="utf-8")
+    code = cli.main([str(deck), "--script-only", "-o", str(tmp_path / "deck.md"),
+                     "--glossary", str(terms), *_model(server)])
+    assert code == 0
+    system = [r for r in server.requests if r["route"] == "chat"][0]["body"]["messages"][0]
+    assert "Rechenzentrum → data centre" in system["content"]
+
+
+def test_a_broken_glossary_is_named(capsys, deck, server, tmp_path):
+    terms = tmp_path / "terms.txt"
+    terms.write_text("Rechenzentrum data centre\n", encoding="utf-8")
+    code = cli.main([str(deck), "--script-only", "--glossary", str(terms), *_model(server)])
+    assert code == 1
+    assert "separator" in capsys.readouterr().err
+    assert server.count("chat") == 0
+
+
+def test_the_glossary_also_reaches_the_translation(deck, server, tmp_path):
+    terms = tmp_path / "terms.json"
+    terms.write_text('{"Folie": "slide"}', encoding="utf-8")
+    cli.main([str(deck), "--script-only", "-o", str(tmp_path / "deck.md"), "--notes",
+              "--translate", "French", "--glossary", str(terms), *_model(server)])
+    system = [r for r in server.requests if r["route"] == "chat"][0]["body"]["messages"][0]
+    assert "You translate" in system["content"]
+    assert "Folie → slide" in system["content"]

@@ -74,11 +74,18 @@ def translate_scripts(
     target_lang: str,
     llm_client,
     max_workers: Optional[int] = None,
+    glossary: Optional[dict] = None,
 ) -> List[str]:
-    """The narration in another language, empty slides stay empty."""
+    """The narration in another language, empty slides stay empty.
+
+    The glossary holds here as well, so a term that was pinned while the
+    narration was written keeps its wording in the other language.
+    """
     if not (target_lang or "").strip():
         return list(scripts)
-    return llm_client.translate_batch(list(scripts), target_lang, max_workers=max_workers)
+    return llm_client.translate_batch(
+        list(scripts), target_lang, max_workers=max_workers, glossary=glossary
+    )
 
 
 def check_count(scripts: Sequence[str], count: int) -> List[str]:

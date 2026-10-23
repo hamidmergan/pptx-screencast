@@ -90,6 +90,19 @@ Translate the narration before it is spoken:
 pptx-screencast deck.pptx --notes --translate German --voice alloy ...
 ```
 
+Pin how a term has to come out, for the narration and for a translation:
+
+```bash
+pptx-screencast deck.pptx --glossary terms.txt --voice alloy ...
+```
+
+A glossary is one `term = replacement` per line, or a JSON object. Lines starting with `#` are comments:
+
+```
+Rechenzentrum = data centre
+Folie = slide
+```
+
 Only a few slides, counted from one:
 
 ```bash
@@ -189,6 +202,8 @@ Order: argument, then environment variable, then default.
 | `max_slides` / `--max-slides` | `PPTX_SCREENCAST_MAX_SLIDES` | 500 |
 | `max_workers` / `--max-workers` | `PPTX_SCREENCAST_MAX_WORKERS` | 4 |
 | `work_dir` / `--work-dir` | `PPTX_SCREENCAST_WORK_DIR` | a temporary folder |
+
+`glossary` / `--glossary` is not a setting but an input, so it has no environment variable. On the command line it is a file, in the Python API a `dict` of term to replacement.
 
 The speech and recognition routes fall back to the chat values, so one server can serve all three and a second one only needs the values it differs in.
 
